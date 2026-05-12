@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Panel — Nivaran</title>
+  <link rel="stylesheet" href="/static/css/base.css" />
+  <link rel="stylesheet" href="/static/css/nav.css" />
+  <link rel="stylesheet" href="/static/css/admin.css" />
+</head>
+<body>
+<div id="offline-banner"></div>
+<div id="toast-container"></div>
+
+<nav class="navbar">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo">
+      <div class="nav-logo-icon">
+        <img src="/static/img/emblem-of-india.svg" alt="National Emblem of India"
+             style="width:100%;height:100%;object-fit:contain;filter:brightness(0) invert(1);">
+      </div>
+      <div><span class="nav-logo-text">Nivaran</span><span class="nav-logo-tagline">Admin Panel</span></div>
+    </a>
+    <ul class="nav-links">
+      <li><a href="/">🏠 Home</a></li>
+      <li><a href="/dashboard">📋 Dashboard</a></li>
+      <li><a href="/analytics">📊 Analytics</a></li>
+      <li><a href="/admin" class="active">⚙️ Admin</a></li>
+    </ul>
+    <button class="nav-hamburger" id="hamburger"><span></span><span></span><span></span></button>
+  </div>
+  <div class="nav-mobile" id="nav-mobile">
+    <a href="/">🏠 Home</a>
+    <a href="/dashboard">📋 Dashboard</a>
+    <a href="/analytics">📊 Analytics</a>
+    <a href="/admin">⚙️ Admin</a>
+  </div>
+</nav>
+
+<div class="admin-layout">
+
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.1);margin-bottom:12px">
+      <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.4)">Admin Menu</div>
+    </div>
+    <ul class="admin-nav">
+      <li><a href="#" class="active" data-section="health">📊 System Health</a></li>
+      <li><a href="#" data-section="departments">🏛️ Departments</a></li>
+      <li><a href="#" data-section="users">👤 Officers</a></li>
+      <li><a href="#" data-section="routing">🔀 Routing Rules</a></li>
+    </ul>
+  </aside>
+
+  <!-- Content -->
+  <main class="admin-content">
+
+    <!-- System Health -->
+    <div class="admin-section active" id="section-health">
+      <div class="admin-section-header">
+        <h2>📊 System Health</h2>
+        <p>Real-time system statistics and performance metrics.</p>
+      </div>
+
+      <div class="health-grid">
+        <div class="health-card">
+          <div class="health-num" id="h-total">—</div>
+          <div class="health-label">Total Complaints</div>
+        </div>
+        <div class="health-card">
+          <div class="health-num" id="h-today">—</div>
+          <div class="health-label">Classified Today</div>
+        </div>
+        <div class="health-card">
+          <div class="health-num" id="h-pending">—</div>
+          <div class="health-label">Pending</div>
+        </div>
+        <div class="health-card">
+          <div class="health-num" id="h-resolved">—</div>
+          <div class="health-label">Resolved</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h4 style="margin-bottom:16px">🔧 System Status</h4>
+        <div style="display:flex;flex-direction:column;gap:12px" id="system-status">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--neutral-50);border-radius:var(--radius)">
+            <span>🤖 AI Classification (OpenRouter)</span>
+            <span class="badge badge-low" id="status-ai">Checking...</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--neutral-50);border-radius:var(--radius)">
+            <span>🌐 Translation API (Mistral via OpenRouter)</span>
+            <span class="badge badge-low" id="status-translate">Checking...</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--neutral-50);border-radius:var(--radius)">
+            <span>🗄️ Database (AWS DynamoDB)</span>
+            <span class="badge badge-low" id="status-db">Checking...</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--neutral-50);border-radius:var(--radius)">
+            <span>📱 Notifications (AWS SNS)</span>
+            <span class="badge badge-low" id="status-sns">Checking...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Departments -->
+    <div class="admin-section" id="section-departments">
+      <div class="admin-section-header">
+        <h2>🏛️ Department Management</h2>
+        <p>Manage departments and their complaint categories.</p>
+      </div>
+
+      <div class="dept-table-card">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:600;font-size:0.9rem">All Departments</span>
+          <button class="btn btn-primary btn-sm" id="add-dept-btn">+ Add Department</button>
+        </div>
+        <table class="dept-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Categories</th>
+              <th>Officers</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="dept-tbody">
+            <tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-muted)">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Add Department Form -->
+      <div class="add-form-card hidden" id="add-dept-form">
+        <h4 style="margin-bottom:20px">Add New Department</h4>
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">Department Name</label>
+            <input type="text" class="form-control" id="new-dept-name" placeholder="e.g. Jal Nigam" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Head Email</label>
+            <input type="email" class="form-control" id="new-dept-email" placeholder="head@dept.gov.in" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Categories (comma separated)</label>
+          <input type="text" class="form-control" id="new-dept-categories" placeholder="Water Supply, Drainage" />
+        </div>
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-primary" id="save-dept-btn">Save Department</button>
+          <button class="btn btn-secondary" id="cancel-dept-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Officers -->
+    <div class="admin-section" id="section-users">
+      <div class="admin-section-header">
+        <h2>👤 Officer Management</h2>
+        <p>Add and manage department officers.</p>
+      </div>
+
+      <div class="add-form-card">
+        <h4 style="margin-bottom:20px">Add New Officer</h4>
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">Username</label>
+            <input type="text" class="form-control" id="new-officer-user" placeholder="officer.name" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input type="password" class="form-control" id="new-officer-pass" placeholder="••••••••" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Full Name</label>
+            <input type="text" class="form-control" id="new-officer-name" placeholder="Officer Name" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Department</label>
+            <select class="form-control" id="new-officer-dept">
+              <option value="">Select Department</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-primary" id="save-officer-btn">Add Officer</button>
+      </div>
+    </div>
+
+    <!-- Routing Rules -->
+    <div class="admin-section" id="section-routing">
+      <div class="admin-section-header">
+        <h2>🔀 Routing Rules</h2>
+        <p>Configure which categories route to which departments.</p>
+      </div>
+      <div class="card">
+        <table class="dept-table">
+          <thead>
+            <tr><th>Category</th><th>Department</th><th>Priority</th><th>Action</th></tr>
+          </thead>
+          <tbody id="routing-tbody">
+            <tr><td colspan="4" style="text-align:center;padding:32px;color:var(--text-muted)">Loading routing rules...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script type="module" src="/static/js/main.js"></script>
+<script type="module" src="/static/js/offline.js"></script>
+<script type="module">
+import { apiGet, apiPost, showToast } from '/static/js/api.js';
+
+// Sidebar navigation
+document.querySelectorAll('.admin-nav a').forEach(link => {
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    document.querySelectorAll('.admin-nav a').forEach(a => a.classList.remove('active'));
+    document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
+    link.classList.add('active');
+    document.getElementById('section-' + link.dataset.section)?.classList.add('active');
+  });
+});
+
+// Load health stats
+async function loadHealth() {
+  const res = await apiGet('/api/health');
+  if (res.success) {
+    const d = res.data;
+    document.getElementById('h-total').textContent = d.total ?? '—';
+    document.getElementById('h-today').textContent = d.today ?? '—';
+    document.getElementById('h-pending').textContent = d.pending ?? '—';
+    document.getElementById('h-resolved').textContent = d.resolved ?? '—';
+    ['ai','translate','db','sns'].forEach(k => {
+      const el = document.getElementById('status-' + k);
+      const ok = d.services?.[k];
+      el.textContent = ok ? '✅ Operational' : '❌ Down';
+      el.className = 'badge ' + (ok ? 'badge-low' : 'badge-high');
+    });
+  }
+}
+
+// Load departments
+async function loadDepts() {
+  const res = await apiGet('/api/departments');
+  const tbody = document.getElementById('dept-tbody');
+  if (res.success && res.data.length) {
+    tbody.innerHTML = res.data.map(d => `
+      <tr>
+        <td><code>${d.dept_id}</code></td>
+        <td><strong>${d.name}</strong></td>
+        <td>${(d.categories || []).join(', ')}</td>
+        <td>${(d.officer_emails || []).length}</td>
+        <td><button class="btn btn-sm btn-secondary">Edit</button></td>
+      </tr>
+    `).join('');
+  } else {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-muted)">No departments found.</td></tr>';
+  }
+}
+
+// Add dept toggle
+document.getElementById('add-dept-btn')?.addEventListener('click', () => {
+  document.getElementById('add-dept-form').classList.toggle('hidden');
+});
+document.getElementById('cancel-dept-btn')?.addEventListener('click', () => {
+  document.getElementById('add-dept-form').classList.add('hidden');
+});
+
+document.getElementById('save-dept-btn')?.addEventListener('click', async () => {
+  const name = document.getElementById('new-dept-name').value;
+  const email = document.getElementById('new-dept-email').value;
+  const cats = document.getElementById('new-dept-categories').value;
+  if (!name) return showToast('Department name required', 'error');
+  const res = await apiPost('/api/departments', {
+    name, officer_emails: [email],
+    categories: cats.split(',').map(c => c.trim()).filter(Boolean)
+  });
+  if (res.success) { showToast('Department added!', 'success'); loadDepts(); }
+  else showToast(res.error || 'Failed', 'error');
+});
+
+// Load routing rules
+async function loadRouting() {
+  const tbody = document.getElementById('routing-tbody');
+  const rules = [
+    { category: 'Water Supply', dept: 'Jal Nigam', priority: 'HIGH' },
+    { category: 'Electricity', dept: 'DISCOM', priority: 'HIGH' },
+    { category: 'Roads', dept: 'PWD', priority: 'MEDIUM' },
+    { category: 'Sanitation', dept: 'Municipal Corp', priority: 'HIGH' },
+    { category: 'Parks', dept: 'Parks Dept', priority: 'LOW' },
+    { category: 'Police', dept: 'Police Dept', priority: 'HIGH' },
+    { category: 'Health', dept: 'Health Dept', priority: 'HIGH' },
+    { category: 'Education', dept: 'Education Dept', priority: 'MEDIUM' },
+    { category: 'Transport', dept: 'Transport Dept', priority: 'MEDIUM' },
+  ];
+  tbody.innerHTML = rules.map(r => `
+    <tr>
+      <td>${r.category}</td>
+      <td>${r.dept}</td>
+      <td><span class="badge badge-${r.priority === 'HIGH' ? 'high' : r.priority === 'MEDIUM' ? 'medium' : 'low'}">${r.priority}</span></td>
+      <td><button class="btn btn-sm btn-secondary">Edit</button></td>
+    </tr>
+  `).join('');
+}
+
+loadHealth();
+loadDepts();
+loadRouting();
+</script>
+</body>
+</html>

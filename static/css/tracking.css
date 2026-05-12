@@ -1,0 +1,322 @@
+/* ============================================
+   Nivaran — Tracking Page CSS
+   ============================================ */
+
+.tracking-page {
+  min-height: calc(100vh - 64px);
+  padding: 40px 0 80px;
+}
+
+/* ===== SEARCH BOX ===== */
+.tracking-search-box {
+  max-width: 660px;
+  margin: 0 auto 28px;
+  padding: 0 4px;
+}
+
+.tracking-input-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.tracking-input {
+  flex: 1;
+  font-family: 'Courier New', monospace;
+  font-size: 0.97rem;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  padding: 12px 18px;
+  background: white;
+  box-shadow: var(--shadow-sm);
+}
+
+.track-btn {
+  padding: 12px 22px;
+  font-size: 0.95rem;
+  border-radius: var(--radius);
+  flex-shrink: 0;
+  gap: 7px;
+}
+
+/* ===== RESULT CARD ===== */
+.result-card {
+  max-width: 660px;
+  margin: 0 auto;
+  padding: 0 4px;
+}
+
+.result-card.hidden { display: none; }
+
+/* Header */
+.result-header {
+  background: white;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: 24px 28px 20px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-bottom: none;
+}
+
+.result-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.result-ticket-id {
+  font-family: 'Sora', monospace;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: 0.5px;
+}
+
+/* Urgency pill */
+.urgency-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 14px;
+  border-radius: var(--radius-full);
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-family: var(--font-display);
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.urgency-high   { background: #FDE8E8; color: #C81E1E; }
+.urgency-medium { background: #FEF9C3; color: #C27803; }
+.urgency-low    { background: #DCFCE7; color: #157A45; }
+
+/* Divider */
+.result-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 0;
+}
+
+/* Info grid sections */
+.info-grid {
+  background: white;
+  padding: 16px 28px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+
+.info-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.info-value {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+}
+
+/* AI Summary */
+.summary-block {
+  background: white;
+  padding: 18px 28px;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+
+.summary-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.summary-text {
+  font-size: 0.93rem;
+  color: var(--text-secondary);
+  line-height: 1.65;
+  font-style: italic;
+}
+
+/* Original Complaint */
+.original-block {
+  background: white;
+  padding: 18px 28px;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+
+.original-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.original-text {
+  font-size: 0.97rem;
+  color: var(--text-primary);
+  line-height: 1.6;
+  font-weight: 500;
+}
+
+.english-text {
+  margin-top: 8px;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.english-text strong {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* ===== JOURNEY ===== */
+.journey-block {
+  background: white;
+  padding: 22px 28px 28px;
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.journey-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+  text-transform: uppercase;
+}
+
+.steps-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.step-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  position: relative;
+  padding-bottom: 4px;
+}
+
+/* Vertical connector line */
+.step-item:not(:last-child) .step-left::after {
+  content: '';
+  position: absolute;
+  left: 14px;
+  top: 32px;
+  bottom: -4px;
+  width: 2px;
+  background: var(--neutral-200);
+  z-index: 0;
+}
+
+.step-item.completed:not(:last-child) .step-left::after {
+  background: var(--india-green);
+}
+
+.step-left {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  width: 30px;
+}
+
+.step-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  background: var(--neutral-100);
+  border: 2px solid var(--neutral-200);
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  transition: var(--transition);
+}
+
+.step-item.completed .step-icon {
+  background: var(--success-light);
+  border-color: var(--india-green);
+}
+
+.step-item.current .step-icon {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  animation: pulse-ring 1.5s ease infinite;
+}
+
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(212,80,10,0.3); }
+  70%  { box-shadow: 0 0 0 6px rgba(212,80,10,0); }
+  100% { box-shadow: 0 0 0 0 rgba(212,80,10,0); }
+}
+
+.step-content {
+  flex: 1;
+  padding-bottom: 22px;
+}
+
+.step-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.step-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--neutral-300);
+  font-family: var(--font-display);
+}
+
+.step-item.completed .step-name,
+.step-item.current .step-name {
+  color: var(--text-primary);
+}
+
+.step-time {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.step-note {
+  margin-top: 4px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .info-grid { grid-template-columns: repeat(2, 1fr); }
+  .result-ticket-id { font-size: 1.15rem; }
+  .result-header, .info-grid, .summary-block,
+  .original-block, .journey-block { padding-left: 18px; padding-right: 18px; }
+}

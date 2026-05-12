@@ -1,0 +1,136 @@
+/* ============================================
+   NivAI — Admin Page CSS
+   ============================================ */
+
+.admin-layout {
+  min-height: calc(100vh - 64px);
+  display: grid;
+  grid-template-columns: 240px 1fr;
+}
+
+.admin-sidebar {
+  background: var(--neutral-900);
+  padding: 24px 0;
+  position: sticky;
+  top: 64px;
+  height: calc(100vh - 64px);
+  overflow-y: auto;
+}
+
+.admin-nav { list-style: none; }
+
+.admin-nav li a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 20px;
+  color: var(--neutral-400);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: var(--transition);
+  text-decoration: none;
+}
+
+.admin-nav li a:hover,
+.admin-nav li a.active {
+  background: rgba(255,255,255,0.07);
+  color: white;
+  border-right: 3px solid var(--primary);
+}
+
+.admin-content {
+  padding: 32px;
+  overflow-y: auto;
+}
+
+.admin-section {
+  display: none;
+}
+.admin-section.active { display: block; }
+
+.admin-section-header {
+  margin-bottom: 28px;
+}
+
+/* Health Stats Grid */
+.health-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+.health-card {
+  background: white;
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  text-align: center;
+}
+
+.health-num {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--primary);
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.health-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* Department Table */
+.dept-table-card {
+  background: white;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.dept-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.dept-table th {
+  background: var(--neutral-50);
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.dept-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--neutral-100);
+}
+
+.dept-table tr:last-child td { border-bottom: none; }
+
+/* Add Form Panel */
+.add-form-card {
+  background: white;
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  margin-top: 24px;
+}
+
+@media (max-width: 768px) {
+  .admin-layout { grid-template-columns: 1fr; }
+  .admin-sidebar { position: static; height: auto; }
+  .health-grid { grid-template-columns: repeat(2, 1fr); }
+  .admin-content { padding: 16px; }
+}

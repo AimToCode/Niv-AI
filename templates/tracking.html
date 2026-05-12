@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Track Complaint — Nivaran</title>
+  <link rel="stylesheet" href="/static/css/base.css" />
+  <link rel="stylesheet" href="/static/css/nav.css" />
+  <link rel="stylesheet" href="/static/css/tracking.css" />
+</head>
+<body>
+<div id="offline-banner"></div>
+<div id="toast-container"></div>
+
+<nav class="navbar">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo">
+      <div class="nav-logo-icon">
+        <img src="/static/img/emblem-of-india.svg" alt="National Emblem of India"
+             style="width:100%;height:100%;object-fit:contain;filter:brightness(0) invert(1);">
+      </div>
+      <div class="nav-logo-wordmark">
+        <span class="nav-logo-text">Nivaran</span>
+        <span class="nav-logo-tagline">Grievance Classification System</span>
+      </div>
+    </a>
+    <ul class="nav-links">
+      <li><a href="/">🏠 Home</a></li>
+      <li><a href="/tracking" class="active">🎫 Track Complaint</a></li>
+      <li><a href="/analytics">📊 Analytics</a></li>
+    </ul>
+    <div class="nav-actions">
+      <a href="/dashboard" class="btn btn-primary btn-sm">🔐 Department Login</a>
+    </div>
+    <button class="nav-hamburger" id="hamburger"><span></span><span></span><span></span></button>
+  </div>
+  <div class="nav-mobile" id="nav-mobile">
+    <a href="/">🏠 Home</a>
+    <a href="/tracking">🎫 Track Complaint</a>
+    <a href="/analytics">📊 Analytics</a>
+    <a href="/dashboard">🔐 Department Login</a>
+  </div>
+</nav>
+
+<div class="tracking-page">
+  <div class="container container-sm">
+
+    <!-- Search Box -->
+    <div class="tracking-search-box">
+      <div class="tracking-input-row">
+        <input
+          type="text"
+          class="form-control tracking-input"
+          id="ticket-input"
+          placeholder="GRV-20240421-XXXX"
+          maxlength="22"
+        />
+        <button class="btn btn-primary track-btn" id="track-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          Track
+        </button>
+      </div>
+    </div>
+
+    <!-- Not Found -->
+    <div class="card text-center hidden" id="not-found-card">
+      <div style="font-size:3rem;margin-bottom:12px">🔍</div>
+      <h3>Complaint Not Found</h3>
+      <p>No complaint found with this ticket ID. Please check and try again.</p>
+      <a href="/" class="btn btn-primary mt-4">📝 File New Complaint</a>
+    </div>
+
+    <!-- Result Card -->
+    <div class="result-card hidden" id="stepper-section">
+
+      <!-- Header: Ticket ID + Urgency Badge -->
+      <div class="result-header">
+        <div>
+          <div class="result-label">TICKET ID</div>
+          <div class="result-ticket-id" id="detail-ticket-id">—</div>
+        </div>
+        <span class="urgency-pill" id="detail-urgency-badge">—</span>
+      </div>
+
+      <div class="result-divider"></div>
+
+      <!-- Row 1: Category, Department, Filed On -->
+      <div class="info-grid">
+        <div class="info-cell">
+          <div class="info-label">CATEGORY</div>
+          <div class="info-value" id="detail-category">—</div>
+        </div>
+        <div class="info-cell">
+          <div class="info-label">DEPARTMENT</div>
+          <div class="info-value" id="detail-department">—</div>
+        </div>
+        <div class="info-cell">
+          <div class="info-label">FILED ON</div>
+          <div class="info-value" id="detail-filed">—</div>
+        </div>
+      </div>
+
+      <!-- Row 2: Language, Location, Status -->
+      <div class="info-grid" style="margin-top:12px">
+        <div class="info-cell">
+          <div class="info-label">LANGUAGE</div>
+          <div class="info-value" id="detail-language">—</div>
+        </div>
+        <div class="info-cell">
+          <div class="info-label">LOCATION</div>
+          <div class="info-value" id="detail-location">—</div>
+        </div>
+        <div class="info-cell">
+          <div class="info-label">STATUS</div>
+          <div class="info-value" id="detail-status">—</div>
+        </div>
+      </div>
+
+      <div class="result-divider"></div>
+
+      <!-- AI Summary -->
+      <div class="summary-block">
+        <div class="summary-label">🤖 AI SUMMARY</div>
+        <div class="summary-text" id="detail-summary">—</div>
+      </div>
+
+      <div class="result-divider"></div>
+
+      <!-- Original Complaint + Translation -->
+      <div class="original-block">
+        <div class="original-label">✏️ ORIGINAL COMPLAINT</div>
+        <div class="original-text" id="detail-original">—</div>
+        <div class="english-text" id="detail-english"></div>
+      </div>
+
+      <div class="result-divider"></div>
+
+      <!-- Complaint Journey -->
+      <div class="journey-block">
+        <div class="journey-label">♟ COMPLAINT JOURNEY</div>
+        <div class="steps-list" id="steps-list"></div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<script type="module" src="/static/js/main.js"></script>
+<script type="module" src="/static/js/tracking.js"></script>
+<script type="module" src="/static/js/offline.js"></script>
+</body>
+</html>

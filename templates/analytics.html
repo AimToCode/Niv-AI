@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Analytics — Nivaran</title>
+  <link rel="stylesheet" href="/static/css/base.css" />
+  <link rel="stylesheet" href="/static/css/nav.css" />
+  <link rel="stylesheet" href="/static/css/analytics.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div id="offline-banner"></div>
+<div id="toast-container"></div>
+
+<nav class="navbar">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo">
+      <div class="nav-logo-icon">
+        <img src="/static/img/emblem-of-india.svg" alt="National Emblem of India"
+             style="width:100%;height:100%;object-fit:contain;filter:brightness(0) invert(1);">
+      </div>
+      <div class="nav-logo-wordmark">
+        <span class="nav-logo-text">Nivaran</span>
+        <span class="nav-logo-tagline">Analytics</span>
+      </div>
+    </a>
+    <ul class="nav-links">
+      <li><a href="/">🏠 Home</a></li>
+      <li><a href="/tracking">🎫 Track</a></li>
+      <li><a href="/dashboard">📋 Dashboard</a></li>
+      <li><a href="/analytics" class="active">📊 Analytics</a></li>
+    </ul>
+    <div class="nav-actions">
+      <a href="/dashboard" class="btn btn-primary btn-sm">🔐 Login</a>
+    </div>
+    <button class="nav-hamburger" id="hamburger"><span></span><span></span><span></span></button>
+  </div>
+  <div class="nav-mobile" id="nav-mobile">
+    <a href="/">🏠 Home</a>
+    <a href="/tracking">🎫 Track</a>
+    <a href="/dashboard">📋 Dashboard</a>
+    <a href="/analytics">📊 Analytics</a>
+  </div>
+</nav>
+
+<div class="analytics-page">
+  <div class="container">
+    <div class="analytics-header">
+      <h2>📊 Grievance Analytics</h2>
+      <p>Real-time insights into complaint patterns and department performance.</p>
+    </div>
+
+    <!-- Top Metrics -->
+    <div class="metrics-row">
+      <div class="metric-card">
+        <div class="metric-icon">📋</div>
+        <div>
+          <div class="metric-num" id="m-total">—</div>
+          <div class="metric-label">Total Complaints (30 days)</div>
+        </div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-icon">⚡</div>
+        <div>
+          <div class="metric-num" id="m-avg-time">—</div>
+          <div class="metric-label">Avg Classification Time</div>
+        </div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-icon">✅</div>
+        <div>
+          <div class="metric-num" id="m-resolution">—</div>
+          <div class="metric-label">Resolution Rate</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top Charts Row -->
+    <div class="charts-grid-top">
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div>
+            <div class="chart-card-title">Complaints by Category</div>
+            <div class="chart-card-sub">Last 30 days</div>
+          </div>
+        </div>
+        <div class="chart-container">
+          <canvas id="chart-category"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div>
+            <div class="chart-card-title">Urgency Distribution</div>
+            <div class="chart-card-sub">Current month</div>
+          </div>
+        </div>
+        <div class="chart-container">
+          <canvas id="chart-urgency"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mid Row -->
+    <div class="charts-grid-mid">
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div>
+            <div class="chart-card-title">Daily Volume</div>
+            <div class="chart-card-sub">Last 14 days</div>
+          </div>
+        </div>
+        <div class="chart-container">
+          <canvas id="chart-daily"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div>
+            <div class="chart-card-title">Department Resolution Rate</div>
+            <div class="chart-card-sub">% resolved vs total assigned</div>
+          </div>
+        </div>
+        <div class="chart-container">
+          <canvas id="chart-dept"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Heatmap -->
+    <div class="heatmap-card">
+      <div class="chart-card-header">
+        <div>
+          <div class="chart-card-title">📍 Area-wise Complaint Density</div>
+          <div class="chart-card-sub">Pincode level — darker = more complaints</div>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="heatmap-table" id="heatmap-table">
+          <thead>
+            <tr>
+              <th>Area / Pincode</th>
+              <th>Water</th>
+              <th>Electricity</th>
+              <th>Roads</th>
+              <th>Sanitation</th>
+              <th>Other</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody id="heatmap-tbody">
+            <tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-muted)">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script type="module" src="/static/js/main.js"></script>
+<script type="module" src="/static/js/analytics.js"></script>
+<script type="module" src="/static/js/offline.js"></script>
+</body>
+</html>

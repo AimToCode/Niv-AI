@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Department Dashboard — Nivaran</title>
+  <link rel="stylesheet" href="/static/css/base.css" />
+  <link rel="stylesheet" href="/static/css/nav.css" />
+  <link rel="stylesheet" href="/static/css/dashboard.css" />
+  <style>
+    #alert-bell-wrapper { position:relative; display:inline-flex; align-items:center; }
+    #alert-bell {
+      background:none; border:none; cursor:pointer; font-size:1.3rem;
+      padding:6px 10px; border-radius:8px; transition:background .15s; position:relative;
+    }
+    #alert-bell:hover { background:#f3f4f6; }
+    #alert-bell.has-alerts { animation: bellRing .5s ease 2; }
+    @keyframes bellRing {
+      0%,100%{transform:rotate(0)} 25%{transform:rotate(15deg)} 75%{transform:rotate(-15deg)}
+    }
+    #alert-badge {
+      position:absolute; top:2px; right:2px;
+      background:#c81e1e; color:white; border-radius:50%;
+      width:18px; height:18px; font-size:.6rem; font-weight:700;
+      display:none; align-items:center; justify-content:center;
+      border:2px solid white;
+    }
+    #alert-dropdown {
+      display:none; position:absolute; top:calc(100% + 8px); right:0;
+      width:340px; max-height:420px; overflow-y:auto;
+      background:white; border:1px solid #e5e7eb; border-radius:12px;
+      box-shadow:0 16px 48px rgba(0,0,0,.12); z-index:500;
+    }
+    #alert-dropdown.open { display:block; }
+
+    .password-field-wrap {
+      position: relative; display: flex; align-items: center;
+    }
+    .password-field-wrap .form-control { padding-right: 46px; }
+    .pwd-toggle-btn {
+      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer; padding: 4px;
+      color: var(--text-muted); font-size: 1.1rem; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      transition: color 0.2s; z-index: 2;
+    }
+    .pwd-toggle-btn:hover { color: var(--primary); }
+    .pwd-toggle-btn svg { width: 20px; height: 20px; }
+
+    /* ── View toggle ── */
+    .view-toggle {
+      display: flex; gap: 6px; margin-bottom: 16px;
+      padding: 0 16px;
+    }
+    .view-toggle-btn {
+      padding: 7px 18px; border-radius: 8px; border: 1.5px solid var(--border);
+      background: white; cursor: pointer; font-size: 0.82rem; font-weight: 600;
+      color: var(--text-secondary); transition: all .15s;
+    }
+    .view-toggle-btn.active {
+      background: var(--primary); color: white; border-color: var(--primary);
+    }
+
+    /* ── Cluster table ── */
+    .cluster-table { width:100%; border-collapse:collapse; font-size:0.84rem; }
+    .cluster-table th {
+      background:var(--neutral-50); padding:10px 14px; text-align:left;
+      font-size:0.72rem; font-weight:700; text-transform:uppercase;
+      letter-spacing:.05em; color:var(--text-muted); border-bottom:1px solid var(--border);
+    }
+    .cluster-table td { padding:12px 14px; border-bottom:1px solid var(--border); }
+    .cluster-table tr:hover td { background:var(--neutral-50); cursor:pointer; }
+    .escalation-chip {
+      display:inline-flex; align-items:center; gap:4px;
+      font-size:0.72rem; font-weight:700; padding:3px 8px; border-radius:20px;
+      background:#fef3c7; color:#92400e;
+    }
+    .escalation-chip.was-escalated { background:#fee2e2; color:#991b1b; }
+    .cluster-count-chip {
+      display:inline-flex; align-items:center; justify-content:center;
+      width:28px; height:28px; border-radius:50%; font-weight:800; font-size:0.85rem;
+      background:var(--primary); color:white;
+    }
+    .ticket-pills { display:flex; flex-wrap:wrap; gap:4px; }
+    .ticket-pill {
+      font-family:monospace; font-size:0.7rem; padding:2px 7px;
+      background:var(--neutral-100); border-radius:4px; color:var(--text-secondary);
+    }
+
+    /* ── Transfer panel (inside detail panel) ── */
+    .transfer-section {
+      border:1.5px dashed #e5e7eb; border-radius:10px;
+      padding:14px 16px; margin-top:16px; background:#fffbeb;
+    }
+    .transfer-section h5 {
+      margin:0 0 10px; font-size:0.82rem; font-weight:700;
+      color:#92400e; display:flex; align-items:center; gap:6px;
+    }
+    .transfer-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .transfer-row select { flex:1; min-width:160px; font-size:0.82rem; }
+    .transfer-row .btn { white-space:nowrap; }
+
+    /* ── Cluster detail panel ── */
+    #cluster-detail { padding:20px; }
+    #cluster-detail .cluster-meta {
+      font-size:0.8rem; color:var(--text-muted); margin-bottom:14px; line-height:1.6;
+    }
+    #cluster-detail .cluster-tickets-list { margin-top:10px; }
+    #cluster-detail .ticket-row {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:8px 12px; background:var(--neutral-50); border-radius:8px;
+      margin-bottom:6px; font-size:0.82rem;
+    }
+    #cluster-detail .ticket-row a { color:var(--primary); text-decoration:underline; cursor:pointer; }
+
+    .escalated-badge {
+      display:inline-flex; align-items:center; gap:5px; padding:4px 10px;
+      background:#fee2e2; color:#991b1b; border-radius:8px;
+      font-size:0.75rem; font-weight:700; margin-top:6px;
+    }
+  </style>
+</head>
+<body>
+<div id="offline-banner"></div>
+<div id="toast-container"></div>
+
+<nav class="navbar">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo">
+      <div class="nav-logo-icon">
+        <img src="/static/img/emblem-of-india.svg" alt="National Emblem of India"
+             style="width:100%;height:100%;object-fit:contain;filter:brightness(0) invert(1);">
+      </div>
+      <div class="nav-logo-wordmark">
+        <span class="nav-logo-text">Nivaran</span>
+        <span class="nav-logo-tagline">Department Portal</span>
+      </div>
+    </a>
+    <ul class="nav-links">
+      <li><a href="/">🏠 Home</a></li>
+      <li><a href="/tracking">🎫 Track</a></li>
+      <li><a href="/dashboard" class="active">📋 Dashboard</a></li>
+      <li><a href="/analytics">📊 Analytics</a></li>
+    </ul>
+    <div class="nav-actions">
+      <div id="alert-bell-wrapper">
+        <button id="alert-bell" title="Notifications">🔔</button>
+        <span id="alert-badge"></span>
+        <div id="alert-dropdown"></div>
+      </div>
+      <span id="nav-officer-name" style="font-size:0.8rem;color:var(--text-secondary)"></span>
+      <button class="btn btn-secondary btn-sm hidden" id="logout-btn">Logout</button>
+    </div>
+    <button class="nav-hamburger" id="hamburger"><span></span><span></span><span></span></button>
+  </div>
+  <div class="nav-mobile" id="nav-mobile">
+    <a href="/">🏠 Home</a>
+    <a href="/tracking">🎫 Track</a>
+    <a href="/dashboard">📋 Dashboard</a>
+    <a href="/analytics">📊 Analytics</a>
+  </div>
+</nav>
+
+<!-- LOGIN GATE -->
+<div class="login-gate" id="login-gate">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-icon">🔐</div>
+      <h2 style="margin-bottom:4px">Department Login</h2>
+      <p style="font-size:0.85rem">Access your grievance dashboard</p>
+    </div>
+    <div id="login-error" class="alert alert-danger hidden" style="margin-bottom:16px">
+      ❌ Invalid credentials. Please try again.
+    </div>
+    <div class="form-group">
+      <label class="form-label">Username</label>
+      <input type="text" class="form-control" id="login-username" placeholder="dept.officer@gov.in" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <div class="password-field-wrap">
+        <input type="password" class="form-control" id="login-password" placeholder="••••••••" />
+        <button type="button" class="pwd-toggle-btn" id="pwd-toggle-btn" title="Show/hide password" aria-label="Toggle password visibility">
+          <svg id="icon-eye" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+          <svg id="icon-eye-off" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="display:none">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Department</label>
+      <select class="form-control" id="login-dept">
+        <option value="">Select Department</option>
+        <option value="jal_nigam">Jal Nigam (Water Supply)</option>
+        <option value="pwd">PWD (Roads)</option>
+        <option value="electricity">DISCOM (Electricity)</option>
+        <option value="sanitation">Municipal Sanitation</option>
+        <option value="parks">Parks Department</option>
+        <option value="police">Police Department</option>
+        <option value="health">Health Department</option>
+        <option value="education">Education Department</option>
+        <option value="transport">Transport Department</option>
+        <option value="admin">Super Admin</option>
+      </select>
+    </div>
+    <button class="btn btn-primary btn-lg" style="width:100%;justify-content:center" id="login-btn">
+      <span id="login-btn-text">Login →</span>
+    </button>
+    <p style="font-size:0.75rem;text-align:center;margin-top:14px;color:var(--text-muted)">
+      Demo: username <code>admin</code> / password <code>admin123</code>
+    </p>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="dashboard-page" id="dashboard-page">
+
+  <!-- Header -->
+  <div class="dashboard-header">
+    <div class="dashboard-header-inner">
+      <div class="dashboard-title">
+        <h2>📋 Grievance Dashboard</h2>
+        <p id="dept-label">Loading...</p>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span id="last-updated" style="font-size:0.78rem;color:var(--text-muted)"></span>
+        <button class="btn btn-secondary btn-sm" id="refresh-btn">🔄 Refresh</button>
+        <a href="/admin" class="btn btn-sm" style="background:var(--neutral-100);color:var(--text-secondary)" id="admin-link">⚙️ Admin</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats Bar -->
+  <div class="stats-bar">
+    <div class="stats-bar-inner">
+      <div class="stat-chip">
+        <div class="stat-chip-icon total">📋</div>
+        <div>
+          <div class="stat-chip-num" id="stat-total">—</div>
+          <div class="stat-chip-label">Total Today</div>
+        </div>
+      </div>
+      <div class="stat-chip">
+        <div class="stat-chip-icon high">🚨</div>
+        <div>
+          <div class="stat-chip-num" id="stat-high">—</div>
+          <div class="stat-chip-label">High Urgency</div>
+        </div>
+      </div>
+      <div class="stat-chip">
+        <div class="stat-chip-icon pending">⏳</div>
+        <div>
+          <div class="stat-chip-num" id="stat-pending">—</div>
+          <div class="stat-chip-label">Pending</div>
+        </div>
+      </div>
+      <div class="stat-chip">
+        <div class="stat-chip-icon resolved">✅</div>
+        <div>
+          <div class="stat-chip-num" id="stat-resolved">—</div>
+          <div class="stat-chip-label">Resolved</div>
+        </div>
+      </div>
+      <div class="stat-chip" id="cluster-stat-chip" style="display:none">
+        <div class="stat-chip-icon" style="background:#fee2e2;color:#c81e1e">🔗</div>
+        <div>
+          <div class="stat-chip-num" id="stat-clusters">—</div>
+          <div class="stat-chip-label">Area Clusters</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- View Toggle -->
+  <div class="view-toggle">
+    <button class="view-toggle-btn active" id="view-complaints-btn">📋 All Complaints</button>
+    <button class="view-toggle-btn" id="view-clusters-btn">🔗 Clustered Complaints</button>
+  </div>
+
+  <!-- ── COMPLAINTS VIEW ── -->
+  <div id="complaints-view">
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+      <div class="filter-bar-inner">
+        <span style="font-size:0.8rem;font-weight:600;color:var(--text-secondary)">Filter:</span>
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn high" data-filter="HIGH">🔴 High</button>
+        <button class="filter-btn medium" data-filter="MEDIUM">🟡 Medium</button>
+        <button class="filter-btn low" data-filter="LOW">🟢 Low</button>
+        <button class="filter-btn" data-filter="Submitted">New</button>
+        <button class="filter-btn" data-filter="In Progress">In Progress</button>
+        <input type="date" class="filter-date" id="filter-date" />
+      </div>
+    </div>
+
+    <div class="complaints-section">
+      <!-- Table -->
+      <div class="complaints-table-card">
+        <div class="table-responsive">
+          <table class="complaints-table">
+            <thead>
+              <tr>
+                <th>Ticket ID</th>
+                <th>Summary</th>
+                <th>Category</th>
+                <th>Urgency</th>
+                <th>Location</th>
+                <th>Time</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="complaints-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Detail Panel -->
+      <div class="detail-panel" id="detail-panel">
+        <div class="detail-panel-empty" id="detail-empty">
+          <div class="icon">👈</div>
+          <p>Click on a complaint to view details</p>
+        </div>
+
+        <div id="detail-content" class="hidden">
+          <div class="detail-header">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div>
+                <div style="font-family:monospace;font-size:0.85rem;font-weight:700;color:var(--primary)" id="dp-ticket">—</div>
+                <h4 id="dp-category" style="margin:4px 0 0">—</h4>
+              </div>
+              <span class="badge" id="dp-urgency-badge">—</span>
+            </div>
+          </div>
+
+          <div class="detail-body">
+            <div style="margin-bottom:10px">
+              <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px">Original Complaint</div>
+              <div class="detail-complaint-text" id="dp-complaint-text">—</div>
+            </div>
+
+            <div id="dp-translation-block" style="display:none;margin-bottom:10px;background:#f0fdf4;border-left:3px solid #22c55e;border-radius:0 8px 8px 0;padding:10px 12px">
+              <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;color:#16a34a;margin-bottom:5px;letter-spacing:.06em">🌐 English Translation</div>
+              <div id="dp-translated-text" style="font-size:0.88rem;color:#166534;line-height:1.55">—</div>
+            </div>
+
+            <div class="detail-ai-summary">
+              <div class="detail-ai-label">🤖 AI Summary</div>
+              <div id="dp-summary">—</div>
+            </div>
+
+            <div class="detail-map" id="dp-map">
+              <div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:0.8rem">
+                📍 Location not available
+              </div>
+            </div>
+
+            <div style="margin-bottom:16px">
+              <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:4px">📍 Location</div>
+              <div style="font-size:0.9rem;font-weight:600" id="dp-location">—</div>
+            </div>
+
+            <div class="status-update-row">
+              <select class="form-control" id="dp-status-select">
+                <option value="Submitted">Submitted</option>
+                <option value="Classified">Classified</option>
+                <option value="Assigned">Assigned</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Resolved">Resolved</option>
+                <option value="Closed">Closed</option>
+              </select>
+              <button class="btn btn-primary" id="dp-update-btn">Update</button>
+            </div>
+
+            <!-- Transfer section — visible to admin only -->
+            <div class="transfer-section hidden" id="transfer-section">
+              <h5>🔀 Transfer to Correct Department</h5>
+              <div class="transfer-row">
+                <select class="form-control" id="transfer-dept-select">
+                  <option value="">— Select Department —</option>
+                  <option value="Jal Nigam|jal_nigam">💧 Jal Nigam (Water Supply)</option>
+                  <option value="DISCOM|electricity">⚡ DISCOM (Electricity)</option>
+                  <option value="PWD|pwd">🛣️ PWD (Roads)</option>
+                  <option value="Municipal Corporation|sanitation">🗑️ Municipal Sanitation</option>
+                  <option value="Parks Department|parks">🌳 Parks Department</option>
+                  <option value="Police Department|police">🚔 Police Department</option>
+                  <option value="Health Department|health">🏥 Health Department</option>
+                  <option value="Education Department|education">🏫 Education Department</option>
+                  <option value="Transport Department|transport">🚌 Transport Department</option>
+                  <option value="General Administration|admin">🏛️ General Administration</option>
+                </select>
+                <button class="btn btn-secondary" id="transfer-btn">Transfer</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CLUSTERED VIEW ── -->
+  <div id="clusters-view" style="display:none">
+    <div style="padding:0 16px 12px;font-size:0.82rem;color:var(--text-muted)">
+      Complaints from the same area with similar issues are automatically grouped. Urgency is escalated when 2 or more similar complaints come from one area.
+    </div>
+
+    <div class="complaints-section">
+      <!-- Cluster Table -->
+      <div class="complaints-table-card">
+        <div class="table-responsive">
+          <table class="cluster-table">
+            <thead>
+              <tr>
+                <th>Area / Pincode</th>
+                <th>Category</th>
+                <th>Complaints</th>
+                <th>Urgency</th>
+                <th>Department</th>
+                <th>Latest</th>
+              </tr>
+            </thead>
+            <tbody id="clusters-tbody">
+              <tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted)">Loading clusters...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Cluster Detail Panel -->
+      <div class="detail-panel" id="cluster-detail-panel">
+        <div class="detail-panel-empty" id="cluster-detail-empty">
+          <div class="icon">👈</div>
+          <p>Click a cluster to view grouped complaints</p>
+        </div>
+
+        <div id="cluster-detail" class="hidden">
+          <div class="detail-header">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+              <div>
+                <div style="font-family:monospace;font-size:0.8rem;font-weight:700;color:var(--primary)" id="cd-id">—</div>
+                <h4 id="cd-category" style="margin:4px 0 2px">—</h4>
+                <div style="font-size:0.8rem;color:var(--text-muted)" id="cd-area">—</div>
+              </div>
+              <span class="badge" id="cd-urgency-badge">—</span>
+            </div>
+            <div id="cd-escalated-notice" class="escalated-badge hidden">
+              ⬆️ Urgency escalated due to repeated area complaints
+            </div>
+          </div>
+
+          <div style="padding:16px">
+            <div class="cluster-meta" id="cd-meta"></div>
+
+            <div style="font-size:0.8rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px">
+              AI Summary (representative complaint)
+            </div>
+            <div style="font-size:0.87rem;line-height:1.55;margin-bottom:16px;color:var(--text-secondary)" id="cd-summary"></div>
+
+            <div style="font-size:0.8rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px">
+              Grouped Tickets (<span id="cd-count">0</span>)
+            </div>
+            <div class="cluster-tickets-list" id="cd-tickets"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script type="module" src="/static/js/main.js"></script>
+<script type="module" src="/static/js/alerts.js"></script>
+<script type="module" src="/static/js/dashboard.js"></script>
+<script type="module">import { initAlerts } from "/static/js/alerts.js"; initAlerts();</script>
+<script type="module" src="/static/js/offline.js"></script>
+
+<script>
+  (function() {
+    const pwdInput  = document.getElementById('login-password');
+    const toggleBtn = document.getElementById('pwd-toggle-btn');
+    const iconEye   = document.getElementById('icon-eye');
+    const iconOff   = document.getElementById('icon-eye-off');
+    if (!pwdInput || !toggleBtn) return;
+    toggleBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      const isHidden = pwdInput.type === 'password';
+      pwdInput.type  = isHidden ? 'text' : 'password';
+      iconEye.style.display = isHidden ? 'none'  : '';
+      iconOff.style.display = isHidden ? ''      : 'none';
+      pwdInput.focus();
+    });
+  })();
+</script>
+</body>
+</html>

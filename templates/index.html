@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Nivaran — AI-powered citizen grievance classification system. Submit complaints in any Indian language." />
+  <title>Nivaran — Apni Samasya, Sahi Jagah</title>
+  <link rel="manifest" href="/static/manifest.json" />
+  <link rel="stylesheet" href="/static/css/base.css" />
+  <link rel="stylesheet" href="/static/css/nav.css" />
+  <link rel="stylesheet" href="/static/css/citizen.css" />
+  <style>
+    /* ── User-Duplicate Modal ─────────────────────── */
+    #user-dup-overlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(3px);
+      align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    #user-dup-overlay.show {
+      display: flex;
+      animation: overlayFadeIn .22s ease;
+    }
+    @keyframes overlayFadeIn {
+      from { opacity:0; } to { opacity:1; }
+    }
+    #user-dup-card {
+      background: white;
+      border-radius: 20px;
+      padding: 32px 28px 24px;
+      max-width: 440px;
+      width: 100%;
+      box-shadow: 0 24px 72px rgba(0,0,0,.22);
+      animation: cardSlideIn .28s cubic-bezier(.34,1.56,.64,1);
+      position: relative;
+      text-align: center;
+    }
+    @keyframes cardSlideIn {
+      from { transform: translateY(-28px) scale(.96); opacity:0; }
+      to   { transform: translateY(0)     scale(1);   opacity:1; }
+    }
+    #user-dup-close {
+      position: absolute; top: 14px; right: 16px;
+      background: none; border: none; cursor: pointer;
+      font-size: 1.3rem; color: #9ca3af; line-height:1;
+      padding: 4px 8px; border-radius: 6px;
+      transition: color .15s, background .15s;
+    }
+    #user-dup-close:hover { background:#f3f4f6; color:#374151; }
+    .dup-modal-icon {
+      font-size: 3.2rem; margin-bottom: 12px;
+      display: block;
+      animation: iconBounce .5s cubic-bezier(.34,1.56,.64,1) .1s both;
+    }
+    @keyframes iconBounce {
+      from { transform: scale(0); } to { transform: scale(1); }
+    }
+    #user-dup-title {
+      font-size: 1.1rem; font-weight: 800;
+      color: #1f2937; margin: 0 0 8px;
+      line-height: 1.35;
+    }
+    #user-dup-body {
+      font-size: 0.88rem; color: #6b7280;
+      line-height: 1.6; margin-bottom: 18px;
+    }
+    #user-dup-ticket {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: #fff7ed; border: 1.5px solid #fed7aa;
+      border-radius: 10px; padding: 10px 18px;
+      font-family: monospace; font-size: 1rem; font-weight: 800;
+      color: #c2410c; margin-bottom: 22px;
+      letter-spacing: .03em;
+    }
+    .dup-modal-actions {
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    #user-dup-view-btn {
+      background: var(--primary); color: white;
+      border: none; border-radius: 10px; padding: 12px 20px;
+      font-size: 0.9rem; font-weight: 700; cursor: pointer;
+      transition: opacity .15s;
+    }
+    #user-dup-view-btn:hover { opacity: .88; }
+    #user-dup-anyway-btn {
+      background: none; color: var(--text-secondary);
+      border: 1.5px solid var(--border); border-radius: 10px;
+      padding: 10px 20px; font-size: 0.85rem; font-weight: 600;
+      cursor: pointer; transition: background .15s;
+    }
+    #user-dup-anyway-btn:hover { background: var(--neutral-50); }
+    #user-dup-dismiss-btn {
+      background: none; border: none; color: #9ca3af;
+      font-size: 0.8rem; cursor: pointer; padding: 4px;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── USER-DUPLICATE MODAL (centered overlay) ─────────────────── -->
+<div id="user-dup-overlay" role="dialog" aria-modal="true" aria-labelledby="user-dup-title">
+  <div id="user-dup-card">
+    <button id="user-dup-close" aria-label="Close">✕</button>
+    <span class="dup-modal-icon">⚠️</span>
+    <h2 id="user-dup-title">You have already filed this complaint</h2>
+    <p id="user-dup-body">Our records show that you have already submitted a similar complaint recently.</p>
+    <div id="user-dup-ticket">🎫 <span id="user-dup-ticket-id">—</span></div>
+    <div class="dup-modal-actions">
+      <button id="user-dup-view-btn">🔍 View existing complaint →</button>
+      <button id="user-dup-anyway-btn">Submit anyway</button>
+      <button id="user-dup-dismiss-btn">Dismiss</button>
+    </div>
+  </div>
+</div>
+
+<!-- Offline Banner -->
+<div id="offline-banner">
+  ⚠️ <span id="offline-text">You are offline — complaints will be saved and submitted automatically when connected.</span>
+  <span id="offline-queue-count" style="margin-left:8px;font-weight:700;"></span>
+</div>
+
+<!-- Toast Container -->
+<div id="toast-container"></div>
+
+<!-- NAVBAR -->
+<nav class="navbar" id="main-nav">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo">
+      <div class="nav-logo-icon">
+        <img src="/static/img/emblem-of-india.svg" alt="National Emblem of India"
+             style="width:100%;height:100%;object-fit:contain;filter:brightness(0) invert(1);">
+      </div>
+      <div class="nav-logo-wordmark">
+        <span class="nav-logo-text">Nivaran</span>
+        <span class="nav-logo-tagline">Grievance Classification System</span>
+      </div>
+    </a>
+    <ul class="nav-links">
+      <li><a href="/" class="active">🏠 Home</a></li>
+      <li><a href="/tracking">🎫 Track Complaint</a></li>
+      <li><a href="/analytics">📊 Analytics</a></li>
+    </ul>
+    <div class="nav-actions">
+      <a href="/dashboard" class="btn btn-primary btn-sm">🔐 Department Login</a>
+    </div>
+    <button class="nav-hamburger" id="hamburger" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+  <div class="nav-mobile" id="nav-mobile">
+    <a href="/">🏠 Home</a>
+    <a href="/tracking">🎫 Track Complaint</a>
+    <a href="/analytics">📊 Analytics</a>
+    <a href="/dashboard">🔐 Department Login</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-stambh-watermark" aria-hidden="true">
+    <img src="/static/img/emblem-of-india.svg" alt="" style="width:100%;height:100%;object-fit:contain;">
+  </div>
+  <div class="hero-inner">
+    <div class="hero-emblem-row">
+      <img class="hero-stambh-small" src="/static/img/emblem-of-india.svg" alt="National Emblem of India">
+      <div class="hero-badge">🇮🇳 Government of India Initiative</div>
+    </div>
+    <h1>Apni Samasya, Sahi Jagah</h1>
+    <p class="hero-satyameva">— सत्यमेव जयते —</p>
+    <p class="hero-subtitle">India's AI-powered grievance system — file in any language, get routed to the right department instantly.</p>
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="hero-stat-num" id="stat-total">—</div>
+        <div class="hero-stat-label">Complaints Filed</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-num" id="stat-resolved">—</div>
+        <div class="hero-stat-label">Resolved</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-num">24</div>
+        <div class="hero-stat-label">Languages Supported</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-num">&lt; 1 min</div>
+        <div class="hero-stat-label">Avg Classification Time</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FORM SECTION -->
+<section class="form-section">
+  <div class="form-container">
+
+    <!-- Duplicate Warning Banner (area duplicate) -->
+    <div class="duplicate-banner" id="duplicate-banner">
+      <span style="font-size:1.2rem">⚠️</span>
+      <div class="duplicate-banner-text">
+        <strong>Similar complaint already filed!</strong>
+        <br>Ticket <span id="dup-ticket-id" style="font-family:monospace;font-weight:700"></span> has a similar complaint from your area.
+        <div class="duplicate-actions">
+          <button class="btn btn-sm btn-secondary" id="dup-view-btn">View Existing</button>
+          <button class="btn btn-sm btn-primary" id="dup-submit-anyway">Submit Anyway</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Form Card -->
+    <div class="form-card" id="complaint-form-card">
+      <h2 class="form-title">📝 File a Complaint</h2>
+      <p class="form-desc">Describe your problem in any Indian language. Our AI will classify and route it to the right department.</p>
+
+      <!-- Language Selector -->
+      <div class="form-group">
+        <label class="form-label" for="lang-select">🌐 Select Your Language</label>
+        <div class="lang-select-wrapper">
+          <span class="lang-flag" id="lang-flag">🇮🇳</span>
+          <select class="form-control" id="lang-select">
+            <option value="hi">Hindi (हिन्दी)</option>
+            <option value="en" selected>English</option>
+            <option value="bn">Bengali (বাংলা)</option>
+            <option value="te">Telugu (తెలుగు)</option>
+            <option value="mr">Marathi (मराठी)</option>
+            <option value="ta">Tamil (தமிழ்)</option>
+            <option value="ur">Urdu (اردو)</option>
+            <option value="gu">Gujarati (ગુજરાતી)</option>
+            <option value="kn">Kannada (ಕನ್ನಡ)</option>
+            <option value="or">Odia (ଓଡ଼ିଆ)</option>
+            <option value="ml">Malayalam (മലയാളം)</option>
+            <option value="pa">Punjabi (ਪੰਜਾਬੀ)</option>
+            <option value="as">Assamese (অসমীয়া)</option>
+            <option value="mai">Maithili (मैथिली)</option>
+            <option value="sa">Sanskrit (संस्कृतम्)</option>
+            <option value="kok">Konkani (कोंकणी)</option>
+            <option value="doi">Dogri (डोगरी)</option>
+            <option value="sd">Sindhi (سنڌي)</option>
+            <option value="mni">Manipuri (মণিপুরী)</option>
+            <option value="brx">Bodo (बड़ो)</option>
+            <option value="sat">Santali (ᱥᱟᱱᱛᱟᱲᱤ)</option>
+            <option value="ks">Kashmiri (کٲشُر)</option>
+            <option value="ne">Nepali (नेपाली)</option>
+            <option value="hi-Latn">Hinglish (Roman Hindi)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Category Quick Select -->
+      <div class="form-group">
+        <span class="category-label">⚡ Select Category (Optional)</span>
+        <div class="category-grid" id="category-grid">
+          <button class="category-btn" data-category="Water Supply"><span class="emoji">💧</span>Water</button>
+          <button class="category-btn" data-category="Electricity"><span class="emoji">⚡</span>Electric</button>
+          <button class="category-btn" data-category="Roads"><span class="emoji">🛣️</span>Road</button>
+          <button class="category-btn" data-category="Sanitation"><span class="emoji">🗑️</span>Sanitation</button>
+          <button class="category-btn" data-category="Parks"><span class="emoji">🌳</span>Parks</button>
+          <button class="category-btn" data-category="Police"><span class="emoji">🚔</span>Police</button>
+          <button class="category-btn" data-category="Health"><span class="emoji">🏥</span>Health</button>
+          <button class="category-btn" data-category="Education"><span class="emoji">🏫</span>Education</button>
+          <button class="category-btn" data-category="Transport"><span class="emoji">🚌</span>Transport</button>
+          <button class="category-btn" data-category="Other"><span class="emoji">📦</span>Other</button>
+        </div>
+      </div>
+
+      <!-- One Complaint Alert -->
+      <div class="alert-one-complaint" id="one-complaint-alert" role="alert">
+        <span style="font-size:1.1rem;flex-shrink:0">ℹ️</span>
+        <span id="one-complaint-msg">Please enter one complaint at a time.</span>
+      </div>
+
+      <!-- Complaint Textarea -->
+      <div class="form-group">
+        <label class="form-label" for="complaint-text">📄 Describe Your Problem</label>
+        <div class="complaint-wrapper">
+          <textarea
+            class="form-control complaint-textarea"
+            id="complaint-text"
+            placeholder="Apni samasya yahan likhein... (Write your complaint here...)"
+            maxlength="2000"
+          ></textarea>
+          <button class="voice-btn" id="voice-btn" title="Voice Input">🎤</button>
+        </div>
+        <div class="char-count"><span id="char-count">0</span>/2000 characters</div>
+      </div>
+
+      <!-- Location -->
+      <div class="form-group">
+        <label class="form-label" for="location-input">📍 Location</label>
+        <div class="location-row">
+          <div class="form-group" style="margin-bottom:0">
+            <input type="text" class="form-control" id="location-input" placeholder="Enter area, city or pincode..." />
+          </div>
+          <button class="location-gps-btn" id="gps-btn" title="Use My Location">📍</button>
+        </div>
+        <input type="hidden" id="pincode-input" />
+        <input type="hidden" id="lat-input" />
+        <input type="hidden" id="lng-input" />
+      </div>
+
+      <!-- Contact (Optional) -->
+      <div class="form-group">
+        <label class="form-label" for="contact-input">📱 Phone / Email (Optional — for updates)</label>
+        <input type="text" class="form-control" id="contact-input" placeholder="+91XXXXXXXXXX or email@example.com" />
+      </div>
+
+      <!-- Photo Upload -->
+      <div class="form-group">
+        <label class="form-label">📷 Attach Photo (Optional)</label>
+        <label class="upload-area" for="photo-upload" id="upload-area">
+          <input type="file" id="photo-upload" accept="image/*" />
+          <span id="upload-label">📎 Click to attach a photo or tap to browse</span>
+        </label>
+        <div id="upload-preview" class="hidden"></div>
+      </div>
+
+      <!-- Submit Button -->
+      <button class="btn btn-primary btn-lg submit-btn" id="submit-btn">
+        <span id="submit-btn-text">🚀 Submit Complaint</span>
+      </button>
+    </div>
+
+    <!-- Result Card -->
+    <div class="result-card" id="result-card">
+      <div class="result-success-header">
+        <div class="result-icon">✅</div>
+        <div>
+          <h3 style="margin-bottom:2px">Complaint Registered!</h3>
+          <p style="font-size:0.85rem;margin:0">Your complaint has been classified and routed.</p>
+        </div>
+      </div>
+      <div class="ticket-id-display" id="result-ticket-id">GRV-20240000-0000</div>
+      <div class="result-grid">
+        <div class="result-item">
+          <div class="result-item-label">🏷️ Category</div>
+          <div class="result-item-value" id="result-category">—</div>
+        </div>
+        <div class="result-item">
+          <div class="result-item-label">🏛️ Department</div>
+          <div class="result-item-value" id="result-department">—</div>
+        </div>
+        <div class="result-item">
+          <div class="result-item-label">🚨 Urgency</div>
+          <div class="result-item-value" id="result-urgency">—</div>
+        </div>
+        <div class="result-item">
+          <div class="result-item-label">⏱️ Expected Response</div>
+          <div class="result-item-value" id="result-response-time">—</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <a href="/tracking" class="btn btn-primary" id="track-link">🎫 Track Your Complaint →</a>
+        <button class="btn btn-secondary" id="new-complaint-btn">📝 File Another</button>
+      </div>
+    </div>
+
+    <!-- Complaint Registered Alert Banner -->
+    <div id="registered-alert" style="display:none;margin-top:16px">
+      <div style="background:#dcfce7;border:1px solid #86efac;border-radius:12px;padding:16px 20px;display:flex;align-items:flex-start;gap:14px">
+        <span style="font-size:1.6rem">✅</span>
+        <div>
+          <div style="font-weight:700;color:#14532d;font-size:1rem;margin-bottom:4px">Complaint Successfully Registered!</div>
+          <div style="font-size:.875rem;color:#166534" id="registered-alert-msg">Your complaint has been classified and routed to the correct department.</div>
+          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+            <span id="reg-ticket-display" style="background:white;border:1px solid #86efac;border-radius:6px;padding:4px 12px;font-family:monospace;font-weight:700;color:#14532d;font-size:.9rem"></span>
+            <span id="reg-urgency-display" style="border-radius:6px;padding:4px 12px;font-weight:700;font-size:.85rem"></span>
+          </div>
+          <div style="margin-top:8px;font-size:.8rem;color:#6b7280">
+            🔔 Department has been notified.
+            <a href="#" id="reg-track-link" style="color:#D4500A;font-weight:600">Track your complaint →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MY COMPLAINTS SECTION -->
+<section class="my-complaints-section">
+  <div class="form-container">
+    <div class="my-complaints-card" id="my-complaints-card">
+      <div class="my-complaints-header">
+        <div class="my-complaints-icon">📱</div>
+        <div>
+          <h3 class="my-complaints-title">My Complaints</h3>
+          <p class="my-complaints-desc">Enter the phone number or email you used when filing a complaint to see all your submissions.</p>
+        </div>
+      </div>
+      <div class="my-complaints-search-row">
+        <input type="text" class="form-control" id="my-contact-input" placeholder="+91XXXXXXXXXX or email@example.com" maxlength="100" />
+        <button class="btn btn-primary" id="my-complaints-search-btn">
+          <span id="my-search-btn-text">🔍 Look Up</span>
+        </button>
+      </div>
+      <p class="my-complaints-privacy">🔒 Your contact is only used to find your complaints — no data is stored by this search.</p>
+      <div id="my-complaints-results" class="hidden">
+        <div id="my-complaints-loading" class="my-complaints-loading hidden">
+          <div class="spinner spinner-dark" style="margin:0 auto 10px"></div>
+          <p>Looking up your complaints...</p>
+        </div>
+        <div id="my-complaints-error" class="my-complaints-empty hidden">
+          <div class="my-complaints-empty-icon">⚠️</div>
+          <p id="my-complaints-error-msg">Something went wrong. Please try again.</p>
+        </div>
+        <div id="my-complaints-empty" class="my-complaints-empty hidden">
+          <div class="my-complaints-empty-icon">📭</div>
+          <p>No complaints found for this contact.</p>
+          <p style="font-size:0.8rem;margin-top:4px">Make sure you enter the same phone or email you used when filing.</p>
+        </div>
+        <div id="my-complaints-list"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how-section">
+  <div class="container">
+    <div class="how-section-header">
+      <h2>
+        How
+        <svg class="how-section-chakra" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+          <circle cx="20" cy="20" r="18.5" stroke="currentColor" stroke-width="2.2"/>
+          <circle cx="20" cy="20" r="5" stroke="currentColor" stroke-width="1.8"/>
+          <circle cx="20" cy="20" r="2" fill="currentColor"/>
+          <line x1="20" y1="2" x2="20" y2="15" stroke="currentColor" stroke-width="1.2"/><line x1="20" y1="25" x2="20" y2="38" stroke="currentColor" stroke-width="1.2"/>
+          <line x1="2" y1="20" x2="15" y2="20" stroke="currentColor" stroke-width="1.2"/><line x1="25" y1="20" x2="38" y2="20" stroke="currentColor" stroke-width="1.2"/>
+          <line x1="4.94" y1="7.54" x2="14.26" y2="14.08" stroke="currentColor" stroke-width="1.2"/><line x1="25.74" y1="25.92" x2="35.06" y2="32.46" stroke="currentColor" stroke-width="1.2"/>
+          <line x1="32.46" y1="4.94" x2="25.92" y2="14.26" stroke="currentColor" stroke-width="1.2"/><line x1="14.08" y1="25.74" x2="7.54" y2="35.06" stroke="currentColor" stroke-width="1.2"/>
+        </svg>
+        Nivaran Works
+      </h2>
+      <p>From complaint to resolution — powered by AI</p>
+    </div>
+    <div class="how-steps">
+      <div class="how-step">
+        <div class="how-step-number">📝<span class="how-step-badge">1</span></div>
+        <h4>Submit</h4>
+        <p>Write your grievance in any of 24 Indian languages — even voice</p>
+      </div>
+      <div class="how-step">
+        <div class="how-step-number">🤖<span class="how-step-badge">2</span></div>
+        <h4>AI Classifies</h4>
+        <p>Mistral AI instantly detects category, urgency &amp; language</p>
+      </div>
+      <div class="how-step">
+        <div class="how-step-number">🏛️<span class="how-step-badge">3</span></div>
+        <h4>Auto-Routed</h4>
+        <p>Complaint is sent to the correct government department</p>
+      </div>
+      <div class="how-step">
+        <div class="how-step-number">✅<span class="how-step-badge">4</span></div>
+        <h4>Resolved</h4>
+        <p>Track progress in real-time until closure</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="india-footer">
+  <div class="india-footer-tricolor"><span></span><span></span><span></span></div>
+  <div class="india-footer-inner">
+    <img class="india-footer-emblem" src="/static/img/emblem-of-india.svg" alt="National Emblem of India">
+    <div>
+      <div class="india-footer-title">Nivaran — Apni Samasya, Sahi Jagah</div>
+      <div class="india-footer-satyameva">सत्यमेव जयते</div>
+      <div class="india-footer-links">
+        <a href="/">Home</a>
+        <a href="/tracking">Track Complaint</a>
+        <a href="/analytics">Analytics</a>
+        <a href="/dashboard">Department Login</a>
+      </div>
+    </div>
+    <div class="india-footer-bottom">
+      An AI-powered initiative for transparent and responsive governance &nbsp;·&nbsp; Built with ❤️ for Bharat
+    </div>
+  </div>
+</footer>
+
+<script type="module" src="/static/js/main.js"></script>
+<script type="module" src="/static/js/complaint.js"></script>
+<script type="module" src="/static/js/voice.js"></script>
+<script type="module" src="/static/js/offline.js"></script>
+<script type="module" src="/static/js/duplicate.js"></script>
+<script type="module" src="/static/js/translate.js"></script>
+
+<script type="module">
+import { getMyComplaints } from '/static/js/api.js';
+
+const searchBtn   = document.getElementById('my-complaints-search-btn');
+const searchBtnTxt= document.getElementById('my-search-btn-text');
+const contactInput= document.getElementById('my-contact-input');
+const resultsArea = document.getElementById('my-complaints-results');
+const loadingEl   = document.getElementById('my-complaints-loading');
+const errorEl     = document.getElementById('my-complaints-error');
+const errorMsg    = document.getElementById('my-complaints-error-msg');
+const emptyEl     = document.getElementById('my-complaints-empty');
+const listEl      = document.getElementById('my-complaints-list');
+
+function timeAgoShort(ts) {
+  if (!ts) return '—';
+  const diff = (Date.now() - new Date(ts).getTime()) / 1000;
+  if (diff < 60)    return 'Just now';
+  if (diff < 3600)  return `${Math.floor(diff/60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+  return `${Math.floor(diff/86400)}d ago`;
+}
+function urgencyDotClass(u) {
+  return { HIGH:'high', MEDIUM:'medium', LOW:'low' }[u] || 'default';
+}
+function statusClass(s) {
+  if (!s) return 'default';
+  const sl = s.toLowerCase();
+  if (sl === 'resolved') return 'resolved';
+  if (sl === 'closed')   return 'closed';
+  if (sl === 'submitted' || sl === 'classified') return 'submitted';
+  if (sl.includes('progress') || sl === 'assigned') return 'progress';
+  return 'default';
+}
+function renderComplaints(complaints) {
+  const countBadge = `<div class="mc-count-badge">✅ ${complaints.length} complaint${complaints.length !== 1 ? 's' : ''} found</div>`;
+  const cards = complaints.map(c => {
+    const summary = c.summary || c.category || 'Complaint';
+    const trackUrl = `/tracking?id=${encodeURIComponent(c.ticket_id)}`;
+    return `
+      <a href="${trackUrl}" class="mc-complaint-card" title="Click to track this complaint">
+        <div class="mc-urgency-dot ${urgencyDotClass(c.urgency)}"></div>
+        <div class="mc-body">
+          <div class="mc-ticket">${c.ticket_id}</div>
+          <div class="mc-summary">${summary.slice(0,80)}${summary.length>80?'…':''}</div>
+          <div class="mc-meta">
+            <span class="mc-meta-tag">🏷️ ${c.category}</span>
+            <span class="mc-meta-tag">📍 ${(c.location||'—').slice(0,22)}</span>
+            <span class="mc-meta-tag">🕐 ${timeAgoShort(c.timestamp)}</span>
+            <span class="mc-status-badge ${statusClass(c.status)}">${c.status}</span>
+          </div>
+        </div>
+        <span class="mc-arrow">→</span>
+      </a>`;
+  }).join('');
+  listEl.innerHTML = countBadge + cards;
+}
+async function doSearch() {
+  const contact = contactInput.value.trim();
+  if (!contact || contact.length < 6) {
+    contactInput.focus();
+    contactInput.style.borderColor = 'var(--danger)';
+    setTimeout(() => contactInput.style.borderColor = '', 1200);
+    return;
+  }
+  resultsArea.classList.remove('hidden');
+  loadingEl.classList.remove('hidden');
+  errorEl.classList.add('hidden');
+  emptyEl.classList.add('hidden');
+  listEl.innerHTML = '';
+  searchBtn.disabled = true;
+  searchBtnTxt.textContent = 'Searching…';
+  const result = await getMyComplaints(contact);
+  loadingEl.classList.add('hidden');
+  searchBtn.disabled = false;
+  searchBtnTxt.textContent = '🔍 Look Up';
+  if (!result.success) {
+    errorMsg.textContent = result.error || 'Failed to load. Please try again.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+  const complaints = result.data || [];
+  if (complaints.length === 0) emptyEl.classList.remove('hidden');
+  else renderComplaints(complaints);
+}
+searchBtn.addEventListener('click', doSearch);
+contactInput.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+</script>
+</body>
+</html>
