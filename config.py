@@ -32,8 +32,8 @@ class Config:
     OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', '')
     OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'
     # Tested & confirmed working free models on OpenRouter
-    AI_MODEL = 'google/gemma-4-31b-it:free'
-    TRANSLATION_MODEL = 'google/gemma-4-31b-it:free'
+    AI_MODEL = 'mistralai/mistral-7b-instruct:free'
+    TRANSLATION_MODEL = 'mistralai/mistral-7b-instruct:free'
 
     # AWS DynamoDB (optional — app uses local memory without this)
     AWS_ACCESS_KEY_ID     = os.getenv('AWS_ACCESS_KEY_ID', '')

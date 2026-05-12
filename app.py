@@ -329,6 +329,90 @@ def api_mark_read():
 def api_alert_count():
     return ok({'count': get_unread_count()})
 
+# ── CLASSIFY ─────────────────────────────────────────────────────
+@app.route('/classify', methods=['POST'])
+def api_classify():
+    import os
+    d = request.get_json(silent=True) or {}
+    complaint = clean(d.get('complaint', ''))
+    if not complaint or len(complaint) < 3:
+        return err('complaint text is required (min 3 chars)')
+
+    api_key = os.environ.get('OPENROUTER_API_KEY', '')
+    if not api_key:
+        return err('OPENROUTER_API_KEY is not configured', 503)
+
+    system_prompt = (
+        "You are a government complaint classifier. "
+        "Given a citizen complaint, respond with ONLY valid JSON — no markdown, no explanation.\n\n"
+        "Format:\n"
+        '{"department": "...", "urgency": "...", "confidence": "..."}\n\n'
+        "department must be exactly one of: Road, Water, Electricity, Healthcare, Police, Education, Sanitation\n"
+        "urgency must be exactly one of: Low, Medium, High, Critical\n"
+        "confidence must be a decimal between 0 and 1 (e.g. 0.92)\n\n"
+        "Urgency rules:\n"
+        "- Critical: life-threatening emergency, fire, flood, electrocution, heart attack, gas leak, violent crime\n"
+        "- High: no water 3+ days, power outage, sewage overflow, road collapse, serious injury\n"
+        "- Medium: broken infrastructure, pending repair, recurring issue\n"
+        "- Low: minor request, suggestion, cosmetic issue\n\n"
+        "Output ONLY the JSON object."
+    )
+
+    try:
+        resp = requests.post(
+            'https://openrouter.ai/api/v1/chat/completions',
+            headers={
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'https://nivaran.gov.in',
+                'X-Title': 'Nivaran Grievance System',
+            },
+            json={
+                'model': 'mistralai/mistral-7b-instruct:free',
+                'max_tokens': 100,
+                'temperature': 0.1,
+                'messages': [
+                    {'role': 'system', 'content': system_prompt},
+                    {'role': 'user', 'content': f'Classify this complaint:\n\n"{complaint}"'},
+                ],
+            },
+            timeout=20,
+        )
+    except requests.exceptions.Timeout:
+        return err('Classification request timed out', 504)
+    except requests.exceptions.RequestException as e:
+        return err(f'Network error: {str(e)}', 502)
+
+    if not resp.ok:
+        return err(f'OpenRouter error: HTTP {resp.status_code}', 502)
+
+    try:
+        raw = resp.json()['choices'][0]['message']['content'].strip()
+        raw = raw.replace('```json', '').replace('```', '').strip()
+        start, end = raw.find('{'), raw.rfind('}')
+        if start == -1 or end == -1:
+            raise ValueError('No JSON object found in response')
+        result = __import__('json').loads(raw[start:end + 1])
+
+        valid_depts = {'Road', 'Water', 'Electricity', 'Healthcare', 'Police', 'Education', 'Sanitation'}
+        valid_urgency = {'Low', 'Medium', 'High', 'Critical'}
+
+        department = str(result.get('department', 'Road'))
+        if department not in valid_depts:
+            department = 'Road'
+        urgency = str(result.get('urgency', 'Medium'))
+        if urgency not in valid_urgency:
+            urgency = 'Medium'
+        try:
+            confidence = str(round(float(result.get('confidence', 0.8)), 2))
+        except (TypeError, ValueError):
+            confidence = '0.8'
+
+        return jsonify({'department': department, 'urgency': urgency, 'confidence': confidence})
+    except Exception as e:
+        return err(f'Failed to parse classification response: {str(e)}', 500)
+
+
 # ── DEBUG (visit /api/debug in browser to check config) ──────────
 @app.route('/api/debug')
 def api_debug():
