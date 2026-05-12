@@ -3,7 +3,11 @@
 # Run: python app.py
 # Open: http://localhost:5000
 # ============================================
-import random, string
+import os
+import json
+import random
+import string
+import requests
 from datetime import datetime, timezone
 from flask import Flask, request, jsonify, render_template, send_from_directory
 
@@ -332,7 +336,6 @@ def api_alert_count():
 # ── CLASSIFY ─────────────────────────────────────────────────────
 @app.route('/classify', methods=['POST'])
 def api_classify():
-    import os
     d = request.get_json(silent=True) or {}
     complaint = clean(d.get('complaint', ''))
     if not complaint or len(complaint) < 3:
@@ -358,33 +361,51 @@ def api_classify():
         "Output ONLY the JSON object."
     )
 
-    try:
-        resp = requests.post(
-            'https://openrouter.ai/api/v1/chat/completions',
-            headers={
-                'Authorization': f'Bearer {api_key}',
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'https://nivaran.gov.in',
-                'X-Title': 'Nivaran Grievance System',
-            },
-            json={
-                'model': 'mistralai/mistral-7b-instruct:free',
-                'max_tokens': 100,
-                'temperature': 0.1,
-                'messages': [
-                    {'role': 'system', 'content': system_prompt},
-                    {'role': 'user', 'content': f'Classify this complaint:\n\n"{complaint}"'},
-                ],
-            },
-            timeout=20,
-        )
-    except requests.exceptions.Timeout:
-        return err('Classification request timed out', 504)
-    except requests.exceptions.RequestException as e:
-        return err(f'Network error: {str(e)}', 502)
+    _models = [
+        'google/gemma-4-26b-a4b-it:free',
+        'openai/gpt-oss-20b:free',
+        'nvidia/nemotron-nano-9b-v2:free',
+        'liquid/lfm-2.5-1.2b-instruct:free',
+        'google/gemma-4-31b-it:free',
+        'meta-llama/llama-3.3-70b-instruct:free',
+    ]
 
-    if not resp.ok:
-        return err(f'OpenRouter error: HTTP {resp.status_code}', 502)
+    resp = None
+    last_status = None
+    for _model in _models:
+        try:
+            resp = requests.post(
+                'https://openrouter.ai/api/v1/chat/completions',
+                headers={
+                    'Authorization': f'Bearer {api_key}',
+                    'Content-Type': 'application/json',
+                    'HTTP-Referer': 'https://nivaran.gov.in',
+                    'X-Title': 'Nivaran Grievance System',
+                },
+                json={
+                    'model': _model,
+                    'max_tokens': 100,
+                    'temperature': 0.1,
+                    'messages': [
+                        {'role': 'system', 'content': system_prompt},
+                        {'role': 'user', 'content': f'Classify this complaint:\n\n"{complaint}"'},
+                    ],
+                },
+                timeout=20,
+            )
+            if resp.status_code == 429:
+                last_status = 429
+                print(f'[Classify] {_model} → 429 rate limited, trying next model')
+                continue
+            break
+        except requests.exceptions.Timeout:
+            return err('Classification request timed out', 504)
+        except requests.exceptions.RequestException as e:
+            return err(f'Network error: {str(e)}', 502)
+
+    if resp is None or not resp.ok:
+        code = last_status or (resp.status_code if resp else 502)
+        return err(f'All models rate limited or unavailable (HTTP {code})', 503)
 
     try:
         raw = resp.json()['choices'][0]['message']['content'].strip()
@@ -392,7 +413,7 @@ def api_classify():
         start, end = raw.find('{'), raw.rfind('}')
         if start == -1 or end == -1:
             raise ValueError('No JSON object found in response')
-        result = __import__('json').loads(raw[start:end + 1])
+        result = json.loads(raw[start:end + 1])
 
         valid_depts = {'Road', 'Water', 'Electricity', 'Healthcare', 'Police', 'Education', 'Sanitation'}
         valid_urgency = {'Low', 'Medium', 'High', 'Critical'}
