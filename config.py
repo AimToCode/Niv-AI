@@ -46,6 +46,9 @@ class Config:
     # ntfy.sh topic for push notifications (FREE — no signup)
     NTFY_TOPIC = os.getenv('NTFY_TOPIC', 'nivaran-high-urgency')
 
+    # Clerk OTP authentication (citizen-side)
+    CLERK_PUBLISHABLE_KEY = os.getenv('CLERK_PUBLISHABLE_KEY', '')
+
     # Rate limiting
     RATELIMIT_DEFAULT    = '100 per hour'
     RATELIMIT_STORAGE_URL= 'memory://'

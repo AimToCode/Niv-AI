@@ -9,6 +9,77 @@
   <link rel="stylesheet" href="/static/css/base.css" />
   <link rel="stylesheet" href="/static/css/nav.css" />
   <link rel="stylesheet" href="/static/css/citizen.css" />
+  <!-- Clerk OTP auth -->
+  <script src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js"></script>
+  <script>window.__CLERK_PK__ = '{{ clerk_key }}';</script>
+  <style>
+    /* ── Clerk OTP Modal ─────────────────────────── */
+    #clerk-otp-modal {
+      display: none; position: fixed; inset: 0; z-index: 10000;
+      background: rgba(0,0,0,0.55); backdrop-filter: blur(4px);
+      align-items: center; justify-content: center; padding: 20px;
+    }
+    #clerk-otp-modal.show { display: flex; animation: overlayFadeIn .22s ease; }
+    .clerk-modal-card {
+      background: white; border-radius: 22px; padding: 36px 28px 28px;
+      max-width: 420px; width: 100%; position: relative; text-align: center;
+      box-shadow: 0 24px 80px rgba(0,0,0,.24);
+      animation: cardSlideIn .28s cubic-bezier(.34,1.56,.64,1);
+    }
+    .clerk-close-btn {
+      position: absolute; top: 14px; right: 16px; background: none; border: none;
+      cursor: pointer; font-size: 1.2rem; color: #9ca3af; padding: 4px 8px;
+      border-radius: 6px; transition: color .15s, background .15s; line-height:1;
+    }
+    .clerk-close-btn:hover { background: #f3f4f6; color: #374151; }
+    .clerk-modal-icon { font-size: 3rem; margin-bottom: 10px; display: block; }
+    .clerk-modal-title {
+      font-size: 1.15rem; font-weight: 800; color: #1f2937;
+      margin: 0 0 6px; line-height: 1.3;
+    }
+    .clerk-modal-sub {
+      font-size: 0.85rem; color: #6b7280; margin: 0 0 20px; line-height: 1.55;
+    }
+    .clerk-input {
+      width: 100%; padding: 12px 14px; border: 1.5px solid #d1d5db;
+      border-radius: 10px; font-size: 0.95rem; outline: none;
+      transition: border-color .2s; box-sizing: border-box; margin-bottom: 10px;
+    }
+    .clerk-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(212,80,10,.12); }
+    .clerk-otp-input { letter-spacing: .25em; font-size: 1.3rem; font-weight: 700;
+      text-align: center; font-family: monospace; }
+    .clerk-error-msg { font-size: 0.83rem; color: #c81e1e; min-height: 18px; margin-bottom: 8px; }
+    .clerk-sent-msg { font-size: 0.85rem; color: #065f46; background: #ecfdf5;
+      border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; }
+    .clerk-btn-primary {
+      width: 100%; padding: 13px 20px; background: linear-gradient(135deg, #FF9933, #D4500A);
+      color: white; border: none; border-radius: 10px; font-size: 0.95rem;
+      font-weight: 700; cursor: pointer; transition: opacity .15s; margin-bottom: 8px;
+    }
+    .clerk-btn-primary:hover { opacity: .88; }
+    .clerk-btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+    .clerk-btn-ghost {
+      width: 100%; padding: 10px 20px; background: none; color: #6b7280;
+      border: 1.5px solid #e5e7eb; border-radius: 10px; font-size: 0.88rem;
+      font-weight: 600; cursor: pointer; transition: background .15s;
+    }
+    .clerk-btn-ghost:hover { background: #f9fafb; }
+    /* ── Auth badge near submit ───────────────────── */
+    .clerk-auth-row {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    #clerk-user-badge {
+      display: none; background: #ecfdf5; color: #065f46;
+      border: 1px solid #a7f3d0; border-radius: 8px; padding: 5px 12px;
+      font-size: 0.8rem; font-weight: 600; align-items: center; gap: 5px;
+    }
+    #clerk-signout-btn {
+      display: none; background: none; border: none; color: #9ca3af;
+      font-size: 0.78rem; cursor: pointer; text-decoration: underline; padding: 0;
+    }
+    #clerk-signout-btn:hover { color: #374151; }
+  </style>
   <style>
     /* ── User-Duplicate Modal ─────────────────────── */
     #user-dup-overlay {
@@ -100,6 +171,35 @@
 </head>
 <body>
 
+<!-- ── CLERK OTP AUTH MODAL ────────────────────────────────────── -->
+<div id="clerk-otp-modal" role="dialog" aria-modal="true" aria-labelledby="clerk-modal-title">
+  <div class="clerk-modal-card">
+    <button class="clerk-close-btn" id="clerk-otp-close" aria-label="Close">✕</button>
+    <span class="clerk-modal-icon">🔐</span>
+    <h2 class="clerk-modal-title" id="clerk-modal-title">Verify Your Identity</h2>
+    <p class="clerk-modal-sub">Enter your phone or email — we'll send a one-time password to confirm your identity before filing the complaint.</p>
+    <!-- Step 1: identifier -->
+    <div id="clerk-step-1">
+      <input type="text" id="clerk-identifier" class="clerk-input"
+             placeholder="+91XXXXXXXXXX or email@example.com"
+             autocomplete="tel email" inputmode="tel" />
+      <div id="clerk-error" class="clerk-error-msg"></div>
+      <button id="clerk-send-btn" class="clerk-btn-primary">📲 Send OTP</button>
+      <button id="clerk-cancel-btn" class="clerk-btn-ghost">Cancel</button>
+    </div>
+    <!-- Step 2: OTP code -->
+    <div id="clerk-step-2" class="hidden">
+      <p id="clerk-sent-msg" class="clerk-sent-msg"></p>
+      <input type="text" id="clerk-otp-code" class="clerk-input clerk-otp-input"
+             placeholder="000000" maxlength="6"
+             inputmode="numeric" autocomplete="one-time-code" />
+      <div class="clerk-error-msg" id="clerk-error-2"></div>
+      <button id="clerk-verify-btn" class="clerk-btn-primary">✅ Verify & Continue</button>
+      <button id="clerk-back-btn" class="clerk-btn-ghost">← Back</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── USER-DUPLICATE MODAL (centered overlay) ─────────────────── -->
 <div id="user-dup-overlay" role="dialog" aria-modal="true" aria-labelledby="user-dup-title">
   <div id="user-dup-card">
@@ -143,9 +243,6 @@
       <li><a href="/tracking">🎫 Track Complaint</a></li>
       <li><a href="/analytics">📊 Analytics</a></li>
     </ul>
-    <div class="nav-actions">
-      <a href="/dashboard" class="btn btn-primary btn-sm">🔐 Department Login</a>
-    </div>
     <button class="nav-hamburger" id="hamburger" aria-label="Menu">
       <span></span><span></span><span></span>
     </button>
@@ -154,7 +251,6 @@
     <a href="/">🏠 Home</a>
     <a href="/tracking">🎫 Track Complaint</a>
     <a href="/analytics">📊 Analytics</a>
-    <a href="/dashboard">🔐 Department Login</a>
   </div>
 </nav>
 
@@ -314,6 +410,12 @@
           <span id="upload-label">📎 Click to attach a photo or tap to browse</span>
         </label>
         <div id="upload-preview" class="hidden"></div>
+      </div>
+
+      <!-- Auth badge (shown after OTP verification) -->
+      <div class="clerk-auth-row">
+        <span id="clerk-user-badge"></span>
+        <button id="clerk-signout-btn" type="button">Sign out</button>
       </div>
 
       <!-- Submit Button -->
@@ -480,12 +582,16 @@
   </div>
 </footer>
 
+<script type="module" src="/static/js/clerk-auth.js"></script>
 <script type="module" src="/static/js/main.js"></script>
 <script type="module" src="/static/js/complaint.js"></script>
 <script type="module" src="/static/js/voice.js"></script>
 <script type="module" src="/static/js/offline.js"></script>
 <script type="module" src="/static/js/duplicate.js"></script>
 <script type="module" src="/static/js/translate.js"></script>
+
+<!-- Department Login FAB (bottom right) -->
+<a href="/dashboard" class="dept-fab" title="Department Login" aria-label="Department Login">🏛️</a>
 
 <script type="module">
 import { getMyComplaints } from '/static/js/api.js';

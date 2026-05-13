@@ -77,7 +77,7 @@ def clean(v):
 
 # ── PAGES ────────────────────────────────────────────────────────
 @app.route('/')
-def index(): return render_template('index.html')
+def index(): return render_template('index.html', clerk_key=Config.CLERK_PUBLISHABLE_KEY)
 
 @app.route('/tracking')
 def tracking(): return render_template('tracking.html')

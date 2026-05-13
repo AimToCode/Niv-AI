@@ -1,6 +1,7 @@
 // complaint.js — with same-user duplicate modal (multilingual)
 import { submitComplaint } from './api.js';
 import { showToast, getResponseTime, urgencyClass, setLoading, sanitize } from './main.js';
+import { requireAuth, getVerifiedId } from './clerk-auth.js';
 
 let selectedCategory  = null;
 let photoBase64        = null;
@@ -291,7 +292,7 @@ async function handleSubmit() {
   const lang     = document.getElementById('lang-select')?.value || 'en';
   const location = document.getElementById('location-input')?.value?.trim();
   const pincode  = document.getElementById('pincode-input')?.value?.trim();
-  const contact  = document.getElementById('contact-input')?.value?.trim();
+  let   contact  = document.getElementById('contact-input')?.value?.trim();
   const lat      = document.getElementById('lat-input')?.value;
   const lng      = document.getElementById('lng-input')?.value;
 
@@ -301,6 +302,20 @@ async function handleSubmit() {
   if (!navigator.onLine) {
     showToast('You are offline — complaint saved, will submit when connected', 'warning', 4000);
     return;
+  }
+
+  // ── Clerk OTP gate — verify identity before submitting ───────
+  const authed = await requireAuth();
+  if (!authed) return; // user cancelled the OTP modal
+
+  // Auto-fill contact from verified Clerk identity if empty
+  if (!contact) {
+    const verifiedId = getVerifiedId();
+    if (verifiedId) {
+      contact = verifiedId;
+      const contactEl = document.getElementById('contact-input');
+      if (contactEl) contactEl.value = verifiedId;
+    }
   }
 
   const payload = {
