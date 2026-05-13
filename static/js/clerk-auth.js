@@ -1,5 +1,7 @@
 // ============================================================
 // clerk-auth.js — Clerk OTP authentication for Nivaran
+// Uses dynamic import so any Clerk errors stay contained.
+// Gracefully degrades: if Clerk fails, form submits anyway.
 // ============================================================
 
 let _clerk = null;
@@ -9,16 +11,39 @@ let _signInAttempt = null;
 
 const _pk = window.__CLERK_PK__ || '';
 
-const _ready = (_pk && window.Clerk)
+// Suppress unhandled Clerk-internal rejections (non-Error throws)
+window.addEventListener('unhandledrejection', e => {
+  const reason = e.reason;
+  const msg = (reason && typeof reason === 'object' ? reason.message : String(reason)) || '';
+  if (msg.toLowerCase().includes('clerk') || msg.includes('publishableKey')) {
+    e.preventDefault();
+    console.warn('[Clerk] Suppressed internal rejection:', msg);
+  }
+});
+
+// Lazy-load Clerk via dynamic import and initialize
+const _ready = _pk
   ? (async () => {
       try {
-        const c = new window.Clerk(_pk);
+        console.log('[Clerk] Loading with key prefix:', _pk.slice(0, 12) + '…');
+        // Try multiple import patterns for robustness
+        let ClerkCtor = null;
+        try {
+          const mod = await import('https://esm.sh/@clerk/clerk-js@latest');
+          ClerkCtor = mod.Clerk || mod.default?.Clerk || mod.default;
+        } catch {
+          const mod = await import('https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.mjs');
+          ClerkCtor = mod.Clerk || mod.default?.Clerk || mod.default;
+        }
+        if (!ClerkCtor) throw new Error('Clerk constructor not found in module');
+        const c = new ClerkCtor(_pk);
         await c.load();
         _clerk = c;
         _updateBadge();
         console.log('[Clerk] Ready — signed in:', !!c.user);
       } catch (e) {
-        console.warn('[Clerk] Init error:', e);
+        console.warn('[Clerk] Init skipped:', e?.message || e);
+        // Keep _clerk null — form will work without OTP
       }
     })()
   : Promise.resolve();
@@ -34,7 +59,7 @@ export function getVerifiedId() {
 
 export async function requireAuth() {
   await _ready;
-  if (!_clerk) return true;
+  if (!_clerk) return true;  // graceful degradation — no Clerk
   if (_clerk.user) return true;
   return new Promise(resolve => {
     _resolveAuth = resolve;
@@ -55,16 +80,10 @@ function _updateBadge() {
   const signoutBtn = document.getElementById('clerk-signout-btn');
   const id = getVerifiedId();
   if (badge) {
-    if (id) {
-      badge.textContent = '✅ ' + id;
-      badge.style.display = 'inline-flex';
-    } else {
-      badge.style.display = 'none';
-    }
+    if (id) { badge.textContent = '✅ ' + id; badge.style.display = 'inline-flex'; }
+    else { badge.style.display = 'none'; }
   }
-  if (signoutBtn) {
-    signoutBtn.style.display = id ? 'inline-block' : 'none';
-  }
+  if (signoutBtn) signoutBtn.style.display = id ? 'inline-block' : 'none';
 }
 
 function _showModal() {
@@ -131,7 +150,7 @@ async function _sendOtp() {
     setTimeout(() => document.getElementById('clerk-otp-code')?.focus(), 80);
   } catch (e) {
     console.error('[Clerk] sendOtp:', e);
-    _setError(e.errors?.[0]?.longMessage || e.message || 'Failed to send OTP. Please check and try again.');
+    _setError(e.errors?.[0]?.longMessage || e.message || 'Failed to send OTP. Please try again.');
   } finally {
     _setBusy(btn, false, '📲 Send OTP');
   }
@@ -182,9 +201,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Enter') _verifyOtp();
   });
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') {
-      if (document.getElementById('clerk-otp-modal')?.classList.contains('show')) _hideModal(false);
-    }
+    if (e.key === 'Escape' && document.getElementById('clerk-otp-modal')?.classList.contains('show'))
+      _hideModal(false);
   });
   _ready.then(_updateBadge);
 });
