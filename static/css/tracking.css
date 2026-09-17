@@ -320,3 +320,47 @@
   .result-header, .info-grid, .summary-block,
   .original-block, .journey-block { padding-left: 18px; padding-right: 18px; }
 }
+
+@media (max-width: 480px) {
+  .tracking-page {
+    padding: 28px 0 56px;
+  }
+
+  .tracking-input-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tracking-input,
+  .track-btn {
+    width: 100%;
+  }
+
+  .track-btn {
+    justify-content: center;
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .result-header {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .urgency-pill {
+    align-self: flex-start;
+  }
+
+  .step-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .step-time {
+    white-space: normal;
+  }
+}

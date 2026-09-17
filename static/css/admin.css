@@ -133,4 +133,64 @@
   .admin-sidebar { position: static; height: auto; }
   .health-grid { grid-template-columns: repeat(2, 1fr); }
   .admin-content { padding: 16px; }
+
+  .admin-sidebar {
+    padding: 12px 0;
+  }
+
+  .admin-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    padding: 0 12px;
+  }
+
+  .admin-nav li a {
+    height: 100%;
+    padding: 11px 12px;
+    border-radius: var(--radius-sm);
+  }
+
+  .admin-nav li a:hover,
+  .admin-nav li a.active {
+    border-right: none;
+  }
+
+  .dept-table-card {
+    overflow-x: auto;
+  }
+
+  .dept-table {
+    min-width: 560px;
+  }
+
+  .admin-content #system-status > div {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .health-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .admin-section-header {
+    margin-bottom: 20px;
+  }
+
+  .add-form-card {
+    padding: 18px 16px;
+  }
+
+  .admin-content .card {
+    padding: 16px;
+  }
+
+  .admin-content .card > div[style*="justify-content:space-between"] {
+    align-items: flex-start !important;
+    flex-direction: column;
+    gap: 10px;
+  }
 }
