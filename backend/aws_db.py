@@ -8,6 +8,10 @@ except ImportError:
     HAS_BOTO3 = False
     boto3 = None
 import json
+import os
+import urllib.error
+import urllib.parse
+import urllib.request
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from config import Config
@@ -43,10 +47,70 @@ def _convert_decimals(obj):
     return obj
 
 
+
+
+def _supabase_configured() -> bool:
+    """Return True when server-side Supabase credentials are configured."""
+    return bool(os.getenv("SUPABASE_URL", "").strip() and os.getenv("SUPABASE_SECRET_KEY", "").strip())
+
+
+def _supabase_request(method: str, path: str, payload=None, prefer: str = ""):
+    """Call Supabase PostgREST using server-only credentials (never expose to frontend)."""
+    base_url = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
+    secret = os.getenv("SUPABASE_SECRET_KEY", "").strip()
+    if not base_url or not secret:
+        raise RuntimeError("Supabase is not configured: set SUPABASE_URL and SUPABASE_SECRET_KEY")
+    url = f"{base_url}/rest/v1/{path.lstrip('/')}"
+    body = None if payload is None else json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    headers = {
+        "apikey": secret,
+        "Authorization": f"Bearer {secret}",
+        "Accept": "application/json",
+    }
+    if body is not None:
+        headers["Content-Type"] = "application/json"
+    if prefer:
+        headers["Prefer"] = prefer
+    request = urllib.request.Request(url, data=body, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(request, timeout=12) as response:
+            raw = response.read().decode("utf-8")
+            return json.loads(raw) if raw else None
+    except urllib.error.HTTPError as exc:
+        # Avoid logging headers or credentials; only surface the response body/status.
+        detail = exc.read().decode("utf-8", errors="replace")[:500]
+        raise RuntimeError(f"Supabase HTTP {exc.code}: {detail}") from None
+
+
+def _supabase_get_grievance(ticket_id: str):
+    query = urllib.parse.urlencode({"ticket_id": f"eq.{ticket_id}", "select": "data", "limit": "1"})
+    rows = _supabase_request("GET", f"complaints?{query}") or []
+    return rows[0].get("data") if rows else None
+
+
+def _supabase_save_grievance(data: dict) -> bool:
+    payload = {"ticket_id": data["ticket_id"], "data": data}
+    query = urllib.parse.urlencode({"on_conflict": "ticket_id"})
+    _supabase_request("POST", f"complaints?{query}", payload=[payload], prefer="resolution=merge-duplicates,return=minimal")
+    return True
+
+
+def _supabase_all_grievances(limit: int = 200):
+    query = urllib.parse.urlencode({"select": "data", "order": "created_at.desc", "limit": str(limit)})
+    rows = _supabase_request("GET", f"complaints?{query}") or []
+    return [row["data"] for row in rows if isinstance(row.get("data"), dict)]
+
+
 # ===== GRIEVANCES =====
 
 def save_grievance(data: dict) -> bool:
     """Save a new grievance to DynamoDB or local store."""
+    if _supabase_configured():
+        try:
+            return _supabase_save_grievance(data)
+        except Exception as e:
+            print(f'[Supabase] Save error: {e}')
+            return False
     db = get_dynamodb()
     if not db:
         _LOCAL_STORE['grievances'][data['ticket_id']] = data
@@ -66,6 +130,12 @@ def save_grievance(data: dict) -> bool:
 
 def get_grievance(ticket_id: str) -> dict | None:
     """Get a single grievance by ticket ID."""
+    if _supabase_configured():
+        try:
+            return _supabase_get_grievance(ticket_id)
+        except Exception as e:
+            print(f'[Supabase] Get error: {e}')
+            return None
     db = get_dynamodb()
     if not db:
         return _LOCAL_STORE['grievances'].get(ticket_id)
@@ -81,6 +151,18 @@ def get_grievance(ticket_id: str) -> dict | None:
 
 def get_all_grievances(department: str = None, date_str: str = None, limit: int = 200) -> list:
     """Get grievances, optionally filtered by department/date."""
+    if _supabase_configured():
+        try:
+            items = _supabase_all_grievances(limit)
+            if department and department != 'admin':
+                items = [i for i in items if i.get('department_id') == department or i.get('department') == department]
+            if date_str:
+                items = [i for i in items if i.get('timestamp', '').startswith(date_str)]
+            items.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+            return items[:limit]
+        except Exception as e:
+            print(f'[Supabase] List error: {e}')
+            return []
     db = get_dynamodb()
 
     if not db:
@@ -129,10 +211,22 @@ def get_recent_by_pincode(pincode: str, category: str = None, days: int = 7) -> 
 
 def update_grievance_status(ticket_id: str, new_status: str, officer: str = '') -> bool:
     """Update status and append to status_history."""
-    db = get_dynamodb()
     now = datetime.now(timezone.utc).isoformat()
     history_entry = {'status': new_status, 'timestamp': now, 'updated_by': officer}
 
+    if _supabase_configured():
+        try:
+            grievance = _supabase_get_grievance(ticket_id)
+            if not grievance:
+                return False
+            grievance['status'] = new_status
+            grievance['status_history'] = grievance.get('status_history', []) + [history_entry]
+            return _supabase_save_grievance(grievance)
+        except Exception as e:
+            print(f'[Supabase] Update error: {e}')
+            return False
+
+    db = get_dynamodb()
     if not db:
         if ticket_id in _LOCAL_STORE['grievances']:
             g = _LOCAL_STORE['grievances'][ticket_id]
@@ -159,7 +253,6 @@ def update_grievance_status(ticket_id: str, new_status: str, officer: str = '') 
 
 def transfer_complaint(ticket_id: str, new_department: str, new_department_id: str, officer: str = 'admin') -> bool:
     """Transfer a complaint to a different department (admin only)."""
-    db = get_dynamodb()
     now = datetime.now(timezone.utc).isoformat()
     history_entry = {
         'status': 'Transferred',
@@ -168,6 +261,20 @@ def transfer_complaint(ticket_id: str, new_department: str, new_department_id: s
         'note': f'Transferred to {new_department}'
     }
 
+    if _supabase_configured():
+        try:
+            grievance = _supabase_get_grievance(ticket_id)
+            if not grievance:
+                return False
+            grievance['department'] = new_department
+            grievance['department_id'] = new_department_id
+            grievance['status_history'] = grievance.get('status_history', []) + [history_entry]
+            return _supabase_save_grievance(grievance)
+        except Exception as e:
+            print(f'[Supabase] Transfer error: {e}')
+            return False
+
+    db = get_dynamodb()
     if not db:
         if ticket_id in _LOCAL_STORE['grievances']:
             g = _LOCAL_STORE['grievances'][ticket_id]
