@@ -50,9 +50,9 @@ def _convert_decimals(obj):
 
 
 def _supabase_configured() -> bool:
+   
     """Return True when server-side Supabase credentials are configured."""
     return bool(os.getenv("SUPABASE_URL", "").strip() and os.getenv("SUPABASE_SECRET_KEY", "").strip())
-
 
 def _supabase_request(method: str, path: str, payload=None, prefer: str = ""):
     """Call Supabase PostgREST using server-only credentials (never expose to frontend)."""
@@ -100,6 +100,7 @@ def _supabase_all_grievances(limit: int = 200):
     rows = _supabase_request("GET", f"complaints?{query}") or []
     return [row["data"] for row in rows if isinstance(row.get("data"), dict)]
 
+print("[Supabase] Configured:", _supabase_configured())
 
 # ===== GRIEVANCES =====
 

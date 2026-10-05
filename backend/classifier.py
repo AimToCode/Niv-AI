@@ -1,220 +1,423 @@
 # ============================================
 # Nivaran — classifier.py
+#
 # Classification pipeline:
-#   1. Google Gemini (FREE 1,500 req/day — needs GEMINI_API_KEY from aistudio.google.com)
-#   2. OpenRouter AI (if OPENROUTER_API_KEY set)
-#   3. Keyword fallback (always works, no key needed)
+#   1. Google Gemini API
+#   2. Keyword-based fallback
+#
+# OpenRouter is optional and not required.
 # ============================================
+
 import json
 import os
+import time
 import requests
 
-OPENROUTER_URL  = 'https://openrouter.ai/api/v1/chat/completions'
-OPENROUTER_MODEL  = 'mistralai/mistral-7b-instruct:free'
-FALLBACK_MODEL    = 'google/gemma-2-9b-it:free'
-GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
 
-SYSTEM_PROMPT = """You are a government complaint classifier for India.
-You will receive complaint text IN ENGLISH. Classify it and respond with ONLY this exact JSON
-(no markdown, no extra text, no explanation):
 
+GEMINI_URL = (
+    "https://generativelanguage.googleapis.com/v1beta/"
+    "models/gemini-flash-latest:generateContent"
+)
+
+
+SYSTEM_PROMPT = """
+You are a government complaint classifier for India.
+
+Classify the complaint and return ONLY valid JSON:
 {
-  "category": "one of: Water Supply | Electricity | Roads | Sanitation | Parks | Police | Health | Education | Transport | Other",
-  "department": "exact department name (e.g. Fire Services, Jal Nigam, PWD, DISCOM, Municipal Corporation, Health Department, Police Department, General Administration)",
+  "category": "Water Supply | Electricity | Roads | Sanitation | Parks | Police | Health | Education | Transport | Other",
+  "department": "Responsible department name",
   "urgency": "HIGH | MEDIUM | LOW",
-  "summary": "1-2 sentence plain English summary of the specific issue",
+  "summary": "Specific 1-2 sentence summary of the complaint",
   "confidence": 0.9
 }
 
-Category rules:
-- Health: hospital, doctor, medicine, ambulance, heart attack, injury, medical emergency, disease, clinic
-- Water Supply: water pipe, leak, no water, drainage, sewage, flood
-- Electricity: power cut, electricity, wire, transformer, shock
-- Roads: pothole, road, footpath, bridge, street
-- Sanitation: garbage, toilet, drain, waste, sewage smell
-- Police: crime, theft, harassment, safety, violence, attack
-- Fire/Emergency: fire, blast, gas leak → Other → Fire Services
-- Parks: park, garden, playground, tree
-- Transport: bus, auto, traffic, signal
+CATEGORY RULES:
+- Health: hospital, doctor, medicine, ambulance, injury, illness.
+- Water Supply: no water, water supply, water pipeline, water leak.
+- Electricity: power cut, electric wire, transformer, electrocution.
+- Roads: potholes, damaged roads, footpaths, bridges, street damage.
+- Sanitation: garbage, waste collection, dirty public places, blocked drains.
+- Police: crime, theft, harassment, violence, public safety.
+- Other + Fire Services: fire, explosion, gas leak.
+- Parks: parks, gardens, playgrounds, public trees.
+- Education: schools, colleges, teachers, educational facilities.
+- Transport: buses, public transport, traffic signals, transport services.
+- Other: issues not covered by the above categories.
 
-Urgency:
-- HIGH: fire, flood, accident, death, heart attack, emergency, sewage overflow, collapsed structure, no water 3+ days, gas leak, electrocution, violence
-- MEDIUM: broken infrastructure, pending 1+ week, public inconvenience
-- LOW: minor requests, suggestions, cosmetic issues
+URGENCY RULES:
+- HIGH: immediate threat to life, fire, serious accident, electrocution,
+  violence, major flooding, gas leak, collapsed structure.
+- MEDIUM: damaged infrastructure, recurring service problems,
+  public inconvenience, or unresolved complaints.
+- LOW: suggestions, minor requests, and cosmetic issues.
+- Roads: potholes and damaged roads should normally be MEDIUM.
+- HIGH only if the road issue creates an immediate serious safety risk,
+  such as a collapsed bridge or a major accident hazard.
+- LOW only for minor cosmetic issues or suggestions.
+- Never classify a significant broken road or large pothole as LOW
+  unless the complaint clearly indicates that it is only cosmetic.
 
-Output ONLY valid JSON. No markdown. No explanation."""
+Use only the specified category and urgency values.
+Do not invent facts or exaggerate severity.
+Return ONLY JSON. No Markdown or explanation.
+"""
+
+
+VALID_CATEGORIES = {
+    "Water Supply",
+    "Electricity",
+    "Roads",
+    "Sanitation",
+    "Parks",
+    "Police",
+    "Health",
+    "Education",
+    "Transport",
+    "Other",
+}
+
+VALID_URGENCIES = {"HIGH", "MEDIUM", "LOW"}
 
 
 def classify_complaint(english_text: str) -> dict:
     """
-    Classify a complaint given in English.
-    Returns: category, department, urgency, summary, confidence.
+    Classify an English complaint.
+    Gemini is tried first; keyword fallback is always available.
     """
-    # 1. Try Gemini (free tier — 1,500 req/day, very reliable)
-    gemini_key = os.getenv('GEMINI_API_KEY', '')
+
+    text = str(english_text or "").strip()
+
+    if not text:
+        return {
+            "category": "Other",
+            "department": "General Administration",
+            "urgency": "LOW",
+            "summary": "No complaint text was provided.",
+            "confidence": 0.0,
+        }
+
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+
     if gemini_key:
-        result = _try_gemini(english_text, gemini_key)
-        if result:
+        result = _try_gemini(text, gemini_key)
+
+        if result is not None:
             return result
-        print('[Classifier] Gemini failed, trying OpenRouter...')
 
-    # 2. Try OpenRouter
-    openrouter_key = os.getenv('OPENROUTER_API_KEY', '')
-    if openrouter_key:
-        for model in [OPENROUTER_MODEL, FALLBACK_MODEL]:
-            result = _try_openrouter(english_text, model, openrouter_key)
-            if result:
-                return result
-            print(f'[Classifier] {model} failed, trying next...')
+        print("[Classifier] Gemini unavailable; using keyword fallback.")
+    else:
+        print("[Classifier] GEMINI_API_KEY missing; using keyword fallback.")
 
-    if not gemini_key and not openrouter_key:
-        print('[Classifier] No API keys set — using keyword fallback')
-        print('[Classifier] Tip: Set GEMINI_API_KEY in .env for free AI classification')
-
-    print('[Classifier] All AI methods failed — using keyword fallback')
-    return _fallback_classify(english_text)
+    return _fallback_classify(text)
 
 
 def _try_gemini(text: str, api_key: str) -> dict | None:
-    """Use Google Gemini 1.5 Flash — free tier, 1,500 requests/day."""
-    try:
-        resp = requests.post(
-            f'{GEMINI_URL}?key={api_key}',
-            headers={'Content-Type': 'application/json'},
-            json={
-                'contents': [{
-                    'parts': [{
-                        'text': SYSTEM_PROMPT + f'\n\nClassify this complaint:\n\n"{text}"'
-                    }]
-                }],
-                'generationConfig': {
-                    'temperature': 0.1,
-                    'maxOutputTokens': 350,
+    """Call Gemini, retrying temporary errors up to three times."""
+
+    for attempt in range(3):
+        try:
+            response = requests.post(
+                f"{GEMINI_URL}?key={api_key}",
+                headers={"Content-Type": "application/json"},
+                json={
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": (
+                                        SYSTEM_PROMPT
+                                        + "\n\nComplaint:\n"
+                                        + text
+                                    )
+                                }
+                            ]
+                        }
+                    ],
+                    "generationConfig": {
+                        "temperature": 0.1,
+                        "maxOutputTokens": 800,
+                        "responseMimeType": "application/json",
+                    },
                 },
-            },
-            timeout=20,
-        )
-        if not resp.ok:
-            print(f'[Classifier] Gemini → HTTP {resp.status_code}: {resp.text[:120]}')
+                timeout=25,
+            )
+
+            if response.ok:
+                data = response.json()
+                candidates = data.get("candidates", [])
+
+                if not candidates:
+                    print("[Classifier] Gemini returned no candidates.")
+                    return None
+
+                content = candidates[0].get("content", {})
+                parts = content.get("parts", [])
+
+                raw = "".join(
+                    part.get("text", "")
+                    for part in parts
+                ).strip()
+
+                if not raw:
+                    print("[Classifier] Gemini returned empty text.")
+                    return None
+
+                return _parse_classification(raw, "Gemini")
+
+            print(
+                f"[Classifier] Gemini HTTP {response.status_code} "
+                f"(attempt {attempt + 1}/3)"
+            )
+
+            # Retry only temporary server/rate-limit errors.
+            retryable = response.status_code in {
+                429, 500, 502, 503, 504
+            }
+
+            if not retryable:
+                # Do not print the full response because it may
+                # contain unnecessary diagnostic information.
+                return None
+
+        except requests.RequestException as error:
+            print(
+                f"[Classifier] Network error "
+                f"(attempt {attempt + 1}/3): {error}"
+            )
+
+        except (ValueError, KeyError, TypeError, IndexError) as error:
+            print(f"[Classifier] Gemini response error: {error}")
             return None
 
-        raw = resp.json()['candidates'][0]['content']['parts'][0]['text'].strip()
-        return _parse_classification(raw, 'Gemini')
-    except Exception as e:
-        print(f'[Classifier] Gemini error: {e}')
-        return None
+        if attempt < 2:
+            time.sleep(attempt + 1)
 
-
-def _try_openrouter(text: str, model: str, api_key: str) -> dict | None:
-    """Use OpenRouter free models as backup."""
-    try:
-        resp = requests.post(
-            OPENROUTER_URL,
-            headers={
-                'Authorization': f'Bearer {api_key}',
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'https://nivaran.gov.in',
-                'X-Title': 'Nivaran Grievance System',
-            },
-            json={
-                'model': model,
-                'max_tokens': 350,
-                'temperature': 0.1,
-                'messages': [
-                    {'role': 'system', 'content': SYSTEM_PROMPT},
-                    {'role': 'user',   'content': f'Classify this complaint:\n\n"{text}"'},
-                ],
-            },
-            timeout=20,
-        )
-        if not resp.ok:
-            print(f'[Classifier] {model} → HTTP {resp.status_code}')
-            return None
-
-        raw = resp.json()['choices'][0]['message']['content'].strip()
-        return _parse_classification(raw, model)
-    except Exception as e:
-        print(f'[Classifier] {model} error: {e}')
-        return None
+    print("[Classifier] Gemini retries exhausted.")
+    return None
 
 
 def _parse_classification(raw: str, source: str) -> dict | None:
-    """Parse and validate a JSON classification response."""
+    """Parse, validate, and normalize the model's JSON response."""
+
     try:
-        raw = raw.replace('```json', '').replace('```', '').strip()
-        start, end = raw.find('{'), raw.rfind('}')
-        if start == -1 or end == -1:
+        raw = raw.strip()
+        raw = raw.replace("```json", "").replace("```", "").strip()
+
+        start = raw.find("{")
+        end = raw.rfind("}")
+
+        if start == -1 or end == -1 or end < start:
+            print(f"[Classifier] No JSON found in {source} response.")
             return None
+
         result = json.loads(raw[start:end + 1])
-        for k in ('category', 'department', 'urgency', 'summary'):
-            if k not in result:
-                raise ValueError(f'Missing key: {k}')
 
-        summary = str(result.get('summary', '')).strip()
-        generic = ['citizen has filed a grievance', 'grievance requiring review', 'filed a grievance']
-        if not summary or any(p in summary.lower() for p in generic):
-            cat  = result.get('category', 'Other')
-            dept = result.get('department', 'General Administration')
-            summary = f'Citizen reports a {cat.lower()} issue requiring attention from {dept}.'
+        category = str(result.get("category", "Other")).strip()
+        department = str(
+            result.get("department", "General Administration")
+        ).strip()
+        urgency = str(result.get("urgency", "MEDIUM")).upper().strip()
+        summary = str(result.get("summary", "")).strip()
 
-        print(f'[Classifier] {source} → urgency={result["urgency"]} category={result["category"]}')
+        if category not in VALID_CATEGORIES:
+            print(f"[Classifier] Invalid category from {source}.")
+            return None
+
+        if urgency not in VALID_URGENCIES:
+            print(f"[Classifier] Invalid urgency from {source}.")
+            return None
+
+        if not department:
+            department = "General Administration"
+
+        if not summary:
+            return None
+
+        confidence = float(result.get("confidence", 0.8))
+        confidence = max(0.0, min(1.0, confidence))
+
+        print(
+            f"[Classifier] {source} classification successful: "
+            f"category={category}, urgency={urgency}"
+        )
+
         return {
-            'category':   str(result.get('category',   'Other')),
-            'department': str(result.get('department', 'General Administration')),
-            'urgency':    str(result.get('urgency',    'MEDIUM')),
-            'summary':    summary,
-            'confidence': float(result.get('confidence', 0.8)),
+            "category": category,
+            "department": department,
+            "urgency": urgency,
+            "summary": summary,
+            "confidence": confidence,
         }
-    except Exception as e:
-        print(f'[Classifier] Parse error from {source}: {e}')
+
+    except (ValueError, TypeError, json.JSONDecodeError) as error:
+        print(f"[Classifier] Could not parse {source} response: {error}")
         return None
 
 
 def _fallback_classify(text: str) -> dict:
-    """Keyword-based fallback — always works, no internet needed."""
+    """
+    Keyword-based fallback.
+    Works without an AI API, but is less accurate than Gemini.
+    """
+
     t = text.lower()
 
+    # More specific rules should be checked before general rules.
     rules = [
-        (['heart attack', 'heart', 'cardiac', 'ambulance', 'emergency', 'hospital',
-          'health', 'doctor', 'medicine', 'injury', 'accident', 'unconscious', 'bleeding', 'ill', 'sick'],
-         'Health', 'Health Department'),
-        (['fire', 'blast', 'explosion', 'burn', 'burning', 'smoke'],
-         'Other', 'Fire Services'),
-        (['water', 'pipe', 'leak', 'supply', 'drainage', 'sewage', 'nali', 'flood'],
-         'Water Supply', 'Jal Nigam'),
-        (['electric', 'electricity', 'wire', 'transformer', 'cable', 'current', 'power', 'shock', 'light'],
-         'Electricity', 'DISCOM'),
-        (['road', 'pothole', 'footpath', 'bridge', 'street', 'highway', 'gutter', 'divider'],
-         'Roads', 'PWD'),
-        (['garbage', 'sanitation', 'toilet', 'drain', 'waste', 'sweep', 'sewer', 'dirty'],
-         'Sanitation', 'Municipal Corporation'),
-        (['park', 'garden', 'playground', 'tree'],
-         'Parks', 'Parks Department'),
-        (['police', 'crime', 'theft', 'harassment', 'safety', 'loot', 'attack', 'violence'],
-         'Police', 'Police Department'),
-        (['school', 'education', 'teacher', 'student', 'college'],
-         'Education', 'Education Department'),
-        (['bus', 'transport', 'auto', 'traffic', 'signal', 'vehicle'],
-         'Transport', 'Transport Department'),
+        (
+            [
+                "heart attack", "cardiac arrest", "ambulance",
+                "unconscious", "bleeding heavily", "medical emergency",
+                "hospital emergency", "serious injury",
+            ],
+            "Health",
+            "Health Department",
+            "HIGH",
+        ),
+        (
+            [
+                "fire", "blaze", "explosion", "gas leak",
+                "building collapse",
+            ],
+            "Other",
+            "Fire Services",
+            "HIGH",
+        ),
+        (
+            [
+                "electrocution", "electric shock", "live wire",
+                "sparking wire", "fallen electric wire",
+            ],
+            "Electricity",
+            "DISCOM",
+            "HIGH",
+        ),
+        (
+            [
+                "flood", "flooding", "sewage overflow",
+                "sewage overflowing",
+            ],
+            "Water Supply",
+            "Municipal Corporation",
+            "HIGH",
+        ),
+        (
+            [
+                "no water for 3 days", "no water for three days",
+                "no water for 4 days", "no water for four days",
+                "no water for 5 days", "no water for five days",
+            ],
+            "Water Supply",
+            "Jal Nigam",
+            "HIGH",
+        ),
+        (
+            [
+                "pothole", "damaged road", "broken road",
+                "road damage", "broken bridge", "damaged footpath",
+                "broken footpath",
+            ],
+            "Roads",
+            "PWD",
+            "MEDIUM",
+        ),
+        (
+            [
+                "no water", "water supply", "water shortage",
+                "water pipeline", "water pipe leak", "water leakage",
+            ],
+            "Water Supply",
+            "Jal Nigam",
+            "MEDIUM",
+        ),
+        (
+            [
+                "power cut", "electricity", "electric wire",
+                "transformer", "power outage", "no electricity",
+                "street light not working",
+            ],
+            "Electricity",
+            "DISCOM",
+            "MEDIUM",
+        ),
+        (
+            [
+                "garbage", "rubbish", "waste collection",
+                "dirty public place", "public toilet",
+                "bad smell from garbage", "sewer blockage",
+                "blocked drain", "drain is blocked",
+            ],
+            "Sanitation",
+            "Municipal Corporation",
+            "MEDIUM",
+        ),
+        (
+            [
+                "police", "theft", "robbery", "harassment",
+                "violence", "criminal activity",
+            ],
+            "Police",
+            "Police Department",
+            "MEDIUM",
+        ),
+        (
+            [
+                "hospital", "doctor", "medicine", "clinic",
+                "healthcare", "health center", "health centre",
+            ],
+            "Health",
+            "Health Department",
+            "MEDIUM",
+        ),
+        (
+            [
+                "school", "college", "teacher", "classroom",
+                "education", "exam facility",
+            ],
+            "Education",
+            "Education Department",
+            "MEDIUM",
+        ),
+        (
+            [
+                "bus", "public transport", "transport service",
+                "traffic signal", "bus stop",
+            ],
+            "Transport",
+            "Transport Department",
+            "MEDIUM",
+        ),
+        (
+            [
+                "park", "garden", "playground", "public tree",
+            ],
+            "Parks",
+            "Parks Department",
+            "LOW",
+        ),
     ]
 
-    for keywords, category, department in rules:
-        if any(kw in t for kw in keywords):
-            high_kws = ['heart attack', 'cardiac', 'fire', 'blast', 'ambulance',
-                        'emergency', 'unconscious', 'bleeding', 'flood', 'collapse']
-            urgency = 'HIGH' if any(kw in t for kw in high_kws) else 'MEDIUM'
+    for keywords, category, department, urgency in rules:
+        if any(keyword in t for keyword in keywords):
             return {
-                'category':   category,
-                'department': department,
-                'urgency':    urgency,
-                'summary':    f'Citizen reports a {category.lower()} issue requiring attention from {department}.',
-                'confidence': 0.5,
+                "category": category,
+                "department": department,
+                "urgency": urgency,
+                "summary": (
+                    f"Citizen reports a {category.lower()} issue "
+                    f"requiring attention from {department}."
+                ),
+                "confidence": 0.5,
             }
 
     return {
-        'category':   'Other',
-        'department': 'General Administration',
-        'urgency':    'MEDIUM',
-        'summary':    'Citizen has filed a general grievance requiring review.',
-        'confidence': 0.3,
+        "category": "Other",
+        "department": "General Administration",
+        "urgency": "MEDIUM",
+        "summary": (
+            "The complaint requires review by the appropriate department."
+        ),
+        "confidence": 0.3,
     }

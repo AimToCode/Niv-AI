@@ -23,12 +23,7 @@ offline/            service-worker.js
 ```
 
 ## Run
-The `Start application` workflow runs `python app.py` and serves on port 5000 (Replit webview).
-
-## Environment Variables (all optional)
-See `.env.example`. Without keys the app uses local fallbacks (keyword classification + in-memory storage), which is enough for demos.
-
-Keys: `OPENROUTER_API_KEY`, `GOOGLE_TRANSLATE_API_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `SNS_HIGH_URGENCY_TOPIC`, `SECRET_KEY`.
+The `Start application` workflow runs `python app.py` and serves on port 5000.
 
 ## Demo Logins (department officers)
 | Username | Password | Role |

@@ -85,19 +85,19 @@
         <h4 style="margin-bottom:16px">🔧 System Status</h4>
         <div style="display:flex;flex-direction:column;gap:12px" id="system-status">
           <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--neutral-50);border-radius:var(--radius)">
-            <span>🤖 AI Classification (OpenRouter)</span>
+            <span>🤖 AI Classification (Google Gemini)</span>
             <span class="badge badge-low" id="status-ai">Checking...</span>
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--neutral-50);border-radius:var(--radius)">
-            <span>🌐 Translation API (Mistral via OpenRouter)</span>
+            <span>🌐 Translation API (Google Gemini)</span>
             <span class="badge badge-low" id="status-translate">Checking...</span>
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--neutral-50);border-radius:var(--radius)">
-            <span>🗄️ Database (AWS DynamoDB)</span>
+            <span>🗄️ Database (Supabase)</span>
             <span class="badge badge-low" id="status-db">Checking...</span>
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--neutral-50);border-radius:var(--radius)">
-            <span>📱 Notifications (AWS SNS)</span>
+            <span>📱 Notifications (In-App)</span>
             <span class="badge badge-low" id="status-sns">Checking...</span>
           </div>
         </div>
@@ -213,7 +213,10 @@
 <script type="module" src="/static/js/main.js"></script>
 <script type="module" src="/static/js/offline.js"></script>
 <script type="module">
-import { apiGet, apiPost, showToast } from '/static/js/api.js';
+
+import { apiGet, apiPost } from '/static/js/api.js';
+import { showToast } from '/static/js/main.js';
+
 
 // Sidebar navigation
 document.querySelectorAll('.admin-nav a').forEach(link => {
